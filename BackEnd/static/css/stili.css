@@ -1,0 +1,22 @@
+:root {
+    --bottoni-utente: #d5d5d5;
+    --colore-bottoni: #2a2f5b;
+    --colore-bottoni-secondario: #424242;
+    --colore-bottoni-sfondo: #2a2f5b18;
+    --colore-bottoni-secondario-sfondo: #42424230;
+    
+    --colore-sfumatura: #00ff8c;
+    --bottoni-utente-dark: #343434;  /* Variabile per il colore */
+    --colore-bottoni-dark: #4f4f4f;
+    --colore-bottoni-secondario-dark: #222222;
+
+    /* colori sfondo dark-mode*/
+
+    --colore-sfondo-dark: #001024;
+    --colore-navbar-dark: #1a2035;
+    --colore-beteam: #0374ac;
+}
+
+.colre-BeTeam{
+color: var(--colore-beteam);
+}

@@ -1,0 +1,287 @@
+<!-- templates/ambito.html -->
+{% extends "index.html" %}
+
+{% block title %}Gestione Ambiti{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    {# Contenitore per i messaggi flash gestiti da JavaScript #}
+    <div class="messages mb-3"></div>
+
+    <div class="d-flex justify-content-end align-items-center mb-4"> {# Modificato per allineare solo il bottone a destra #}
+        {# Rimosso il titolo h2 "Gestione Anagrafica Ambiti" #}
+        <a href="{{ url_for('appBT.index') }}" class="btn btn-info btn-sm">
+            <i class="fas fa-arrow-left me-1"></i> Torna alla Home
+        </a>
+    </div>
+
+    <!-- Form per Inserimento/Modifica -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Aggiungi / Modifica Ambito</h5>
+        </div>
+        <div class="card-body">
+            <form id="ambitoForm">
+                <input type="hidden" id="ambitoId">
+                {# Campo nascosto per il token CSRF - DEVE ESSERE {{ csrf_token }} SENZA PARENTESI #}
+                <input type="hidden" id="csrf_token" name="csrf_token" value="{{ csrf_token }}">
+                <div class="mb-3">
+                    <label for="codice" class="form-label">Codice (Acronimo)</label>
+                    <input type="text" class="form-control" id="codice" required>
+                </div>
+                <div class="mb-3">
+                    <label for="descrizione" class="form-label">Descrizione</labeL>
+                    <input type="text" class="form-control" id="descrizione" required>
+                </div>
+                <div class="mb-3">
+                    <label for="note" class="form-label">Note</label>
+                    <textarea class="form-control" id="note" rows="3"></textarea>
+                </div>
+                <button type="submit" class="btn btn-success me-2">Salva</button>
+                <button type="button" class="btn btn-secondary" id="resetForm">Annulla</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabella di Visualizzazione -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">Elenco Ambiti</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Codice</th>
+                            <th>Descrizione</th>
+                            <th>Note</th>
+                            <th>Ultima Modifica</th>
+                            <th>Modificato Da</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ambitiTableBody">
+                        <!-- I dati degli ambiti verranno caricati qui via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} {# Fine del blocco content #}
+
+{% block scripts %} {# Inizio del nuovo blocco scripts #}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("DOM completamente caricato per ambito.html");
+
+        const ambitoForm = document.getElementById('ambitoForm');
+        const ambitoIdInput = document.getElementById('ambitoId');
+        const codiceInput = document.getElementById('codice');
+        const descrizioneInput = document.getElementById('descrizione');
+        const noteInput = document.getElementById('note');
+        const ambitiTableBody = document.getElementById('ambitiTableBody');
+        const resetFormBtn = document.getElementById('resetForm');
+
+        // Recupera il token CSRF dal campo nascosto
+        const csrfToken = document.getElementById('csrf_token').value;
+        console.log("CSRF Token recuperato:", csrfToken ? "presente" : "assente");
+
+        // Utilizza window.location.origin per costruire l'URL assoluto
+        const API_BASE_URL = window.location.origin;
+        const API_URL = `${API_BASE_URL}/api/ambito/`;
+
+
+        function showFlashMessage(message, category = 'info') {
+            const messagesContainer = document.querySelector('.messages');
+            if (!messagesContainer) {
+                console.error("Contenitore messaggi flash non trovato. Impossibile mostrare il messaggio:", message);
+                return;
+            }
+
+            const alertDiv = document.createElement('div');
+            alertDiv.classList.add('alert', `alert-${category}`, 'alert-dismissible', 'fade', 'show');
+            alertDiv.setAttribute('role', 'alert');
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            messagesContainer.appendChild(alertDiv);
+
+            setTimeout(() => {
+                // Ora 'bootstrap' dovrebbe essere definito
+                const bsAlert = new bootstrap.Alert(alertDiv);
+                bsAlert.close();
+            }, 5000);
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const options = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+            try {
+                return new Date(dateString).toLocaleString('it-IT', options);
+            } catch (e) {
+                console.error("Errore nella formattazione della data:", dateString, e);
+                return dateString;
+            }
+        }
+
+        async function loadAmbiti() {
+            console.log("Tentativo di caricare gli ambiti da:", API_URL);
+            try {
+                const response = await fetch(API_URL);
+                console.log("Risposta API ricevuta (loadAmbiti):", response);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error("Errore HTTP nel caricamento ambiti:", response.status, errorText);
+                    throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+                }
+                const ambiti = await response.json();
+                console.log("Dati ambiti ricevuti:", ambiti); // AGGIUNTO: Logga i dati ricevuti
+
+                ambitiTableBody.innerHTML = '';
+                if (ambiti.length === 0) {
+                    const row = ambitiTableBody.insertRow();
+                    const cell = row.insertCell(0);
+                    cell.colSpan = 7;
+                    cell.textContent = "Nessun ambito trovato.";
+                    cell.classList.add('text-center', 'text-muted');
+                } else {
+                    ambiti.forEach(ambito => {
+                        const row = ambitiTableBody.insertRow();
+                        row.insertCell(0).textContent = ambito.id;
+                        row.insertCell(1).textContent = ambito.codice;
+                        row.insertCell(2).textContent = ambito.descrizione;
+                        row.insertCell(3).textContent = ambito.note || '';
+                        row.insertCell(4).textContent = formatDate(ambito.data_ultima_modifica);
+                        row.insertCell(5).textContent = ambito.modificato_da || '';
+
+                        const actionsCell = row.insertCell(6);
+                        // Aggiungi classi Bootstrap per flexbox e gap per allineare i bottoni
+                        actionsCell.classList.add('d-flex', 'gap-1', 'justify-content-center');
+
+                        const editBtn = document.createElement('button');
+                        editBtn.textContent = 'Modifica';
+                        editBtn.classList.add('btn', 'btn-warning', 'btn-sm'); // Rimosso 'me-2'
+                        editBtn.addEventListener('click', () => editAmbito(ambito));
+
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.textContent = 'Elimina';
+                        deleteBtn.classList.add('btn', 'btn-danger', 'btn-sm');
+                        deleteBtn.addEventListener('click', () => deleteAmbito(ambito.id));
+
+                        actionsCell.appendChild(editBtn);
+                        actionsCell.appendChild(deleteBtn);
+                    });
+                }
+            } catch (error) {
+                console.error("Errore nel caricamento degli ambiti (catch block):", error);
+                showFlashMessage(`Errore nel caricamento degli ambiti: ${error.message}`, 'danger');
+            }
+        }
+
+        function editAmbito(ambito) {
+            console.log("Modifica ambito:", ambito);
+            ambitoIdInput.value = ambito.id;
+            codiceInput.value = ambito.codice;
+            descrizioneInput.value = ambito.descrizione;
+            noteInput.value = ambito.note || '';
+            codiceInput.readOnly = true;
+        }
+
+        ambitoForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            console.log("Form sottomesso.");
+            const id = ambitoIdInput.value;
+            const codice = codiceInput.value;
+            const descrizione = descrizioneInput.value;
+            const note = noteInput.value;
+
+            let url = API_URL;
+            let method = 'POST';
+            let successMessage = 'Operazione effettuata correttamente'; 
+            let errorMessage = 'Errore nella creazione dell\'ambito.';
+            let bodyData = { codice: codice, descrizione: descrizione, note: note };
+
+            if (id) {
+                url = `${API_URL}${id}`;
+                method = 'PUT';
+                successMessage = 'Operazione effettuata correttamente'; 
+                errorMessage = 'Errore nell\'aggiornamento dell\'ambito.';
+                bodyData = { descrizione: descrizione, note: note };
+            }
+            console.log(`Invio richiesta ${method} a ${url} con dati:`, bodyData);
+
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify(bodyData)
+                });
+
+                console.log("Risposta API ricevuta per submit:", response);
+                const result = await response.json();
+                console.log("Risultato JSON della risposta:", result);
+
+                if (response.ok) {
+                    showFlashMessage(successMessage, 'success');
+                    ambitoForm.reset();
+                    ambitoIdInput.value = '';
+                    codiceInput.readOnly = false;
+                    loadAmbiti(); // Chiamata completa
+                } else {
+                    showFlashMessage(`${errorMessage} ${result.error || ''}`, 'danger');
+                }
+            } catch (error) {
+                console.error("Errore nella richiesta API (catch block):", error);
+                showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
+            }
+        });
+
+        async function deleteAmbito(id) {
+            if (!confirm('Sei sicuro di voler eliminare questo ambito? Questa operazione è irreversibile!')) {
+                return;
+            }
+            console.log("Tentativo di eliminare ambito con ID:", id);
+
+            try {
+                const response = await fetch(`${API_URL}${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': csrfToken
+                    }
+                });
+
+                console.log("Risposta API ricevuta per delete:", response);
+                const result = await response.json();
+                console.log("Risultato JSON della risposta delete:", result);
+
+                if (response.ok) {
+                    showFlashMessage('Operazione effettuata correttamente', 'success'); 
+                    loadAmbiti();
+                } else {
+                    showFlashMessage(`Errore nell\\'eliminazione dell\\'ambito: ${result.error || ''}`, 'danger');
+                }
+            } catch (error) {
+                console.error("Errore nella richiesta API delete (catch block):", error);
+                showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
+            }
+        }
+
+        resetFormBtn.addEventListener('click', () => {
+            console.log("Resetting form.");
+            ambitoForm.reset();
+            ambitoIdInput.value = '';
+            codiceInput.readOnly = false;
+        });
+
+        loadAmbiti();
+    });
+</script>
+{% endblock %} {# Fine del blocco scripts #}

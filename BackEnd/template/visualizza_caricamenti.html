@@ -1,0 +1,39 @@
+{% extends "index.html" %}
+
+{% block title %}Log Caricamenti Massivi{% endblock title %}
+
+{% block content %}
+    <div class="container-fluid mt-5">
+        <h2>Log Caricamenti Massivi</h2>
+        <p>Questa pagina mostra lo storico dei caricamenti di file esterni.</p>
+
+        {% if caricamenti %}
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th scope="col">ID</th>
+                    <th scope="col">Descrizione</th>
+                    <th scope="col">Data Caricamento</th>
+                    <th scope="col">Utente</th>
+                    <th scope="col">Numero Record</th>
+                    <th scope="col">Stato</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for caricamento in caricamenti %}
+                <tr>
+                    <td>{{ caricamento.ID }}</td>
+                    <td>{{ caricamento.DESCRIZIONE }}</td>
+                    <td>{{ caricamento.DATA_CARICAMENTO.strftime('%d-%m-%Y %H:%M:%S') }}</td>
+                    <td>{{ caricamento.UTENTE }}</td>
+                    <td>{{ caricamento.NUMERO_RECORD }}</td>
+                    <td>{{ caricamento.STATO }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="alert alert-info">Nessun caricamento registrato.</div>
+        {% endif %}
+    </div>
+{% endblock content %}

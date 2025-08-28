@@ -1,0 +1,326 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {# Define the title block here, to be overridden by child templates #}
+    <title>{% block title %}Applicazione Resilienza{% endblock title %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            display: flex;
+            min-height: 100vh;
+            margin: 0;
+            font-family: 'Inter', sans-serif; /* Usiamo Inter per consistenza */
+            background-color: #f0f2f5; /* Sfondo chiaro */
+            padding-top: 45px; /* Spazio per la navbar fissa in alto (altezza ridotta) */
+        }
+        #top-navbar {
+            background-color: #3a3a3a; /* Nuovo colore di sfondo per la navbar superiore */
+            color: white;
+            padding: 0.3rem 1rem; /* Padding ridotto per renderla più sottile */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            width: 100%;
+            z-index: 1030; /* Assicura che sia sopra altri elementi */
+            position: fixed; /* Rende la navbar fissa in alto */
+            top: 0;
+            left: 0;
+        }
+        #top-navbar .navbar-text,
+        #top-navbar .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.75em !important; /* Font più piccolo */
+            margin-right: 10px; /* Margine leggermente ridotto */
+        }
+        #top-navbar .nav-link:hover {
+            color: white;
+        }
+        #top-navbar .nav-link.btn { /* Stile specifico per il bottone di logout nella navbar */
+            font-size: 0.75em !important;
+            padding: 4px 10px; /* Padding ridotto per il bottone */
+        }
+        /* Nuovo stile per il titolo "Resilienza" nella navbar */
+        #top-navbar .navbar-brand.resilienza-title {
+            color: #28a745 !important; /* Colore verde più acceso */
+            font-weight: 700; /* Grassetto per farlo risaltare */
+        }
+
+        #sidebar {
+            width: 250px;
+            background-color: #343a40; /* Colore scuro per la sidebar */
+            color: white;
+            padding: 1rem;
+            flex-shrink: 0;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            border-top-right-radius: 15px; /* Angoli arrotondati */
+            border-bottom-right-radius: 15px; /* Angoli arrotondati */
+            height: calc(100vh - 45px); /* Altezza della sidebar meno l'altezza della navbar ridotta */
+            position: sticky; /* Rende la sidebar "appiccicosa" */
+            top: 45px; /* La fa partire sotto la navbar fissa ridotta */
+        }
+        #content {
+            flex-grow: 1;
+            padding: 30px; /* Aumentato il padding */
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: calc(100vh - 45px); /* Altezza minima del contenuto meno la navbar ridotta */
+            flex-direction: column;
+            background-color: #ffffff; /* Sfondo bianco per il contenuto */
+            border-radius: 15px; /* Angoli arrotondati */
+            margin: 20px; /* Margine intorno al contenuto */
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); /* Ombra leggera */
+            text-align: center; /* Centra il testo nel contenuto principale */
+        }
+
+        /* Stili per le voci di menu (sidebar) */
+        #sidebar .nav-item > .nav-link { /* Seleziona solo i nav-link diretti figli di nav-item */
+            color: #f8f9fa;
+            padding: 10px 15px; /* Ridotto leggermente il padding verticale */
+            margin-bottom: 3px; /* Ridotto leggermente il margine */
+            border-radius: 8px;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            display: flex;
+            align-items: center;
+            font-size: 0.7em !important; /* Font più piccolo per le voci di menu principali */
+        }
+        #sidebar .nav-item > .nav-link:hover, #sidebar .nav-item > .nav-link.active {
+            background-color: #495057;
+            color: #ffffff;
+        }
+        #sidebar .nav-item > .nav-link i {
+            margin-right: 8px; /* Ridotto leggermente il margine dell'icona */
+            font-size: 1em !important; /* L'icona rimane proporzionata */
+        }
+
+        /* Stili per i sottomenu (figli) */
+        #sidebar .nav-item .collapse .nav-item > .nav-link { /* Maggiore specificità */
+            padding-left: 30px; /* Indentazione per i sottomenu */
+            background-color: #2b3035;
+            font-size: 0.65em !important; /* Font ancora più piccolo per i sottomenu */
+        }
+        #sidebar .nav-item .collapse .nav-item > .nav-link:hover {
+            background-color: #3a4045;
+        }
+        #sidebar .nav-item .collapse .nav-item > .nav-link i {
+            margin-right: 8px;
+            font-size: 1em !important;
+        }
+
+
+        /* Stili per i "nipoti" (grandchild) */
+        #sidebar .nav-item .collapse .collapse .nav-item > .nav-link { /* Maggiore specificità */
+            padding-left: 50px; /* Indentazione maggiore per i nipoti */
+            background-color: #22262a;
+            font-size: 0.6em !important; /* Font più piccolo per i nipoti */
+        }
+        #sidebar .nav-item .collapse .collapse .nav-item > .nav-link:hover {
+            background-color: #2e3236;
+        }
+        #sidebar .nav-item .collapse .collapse .nav-item > .nav-link i {
+            margin-right: 8px;
+            font-size: 1em !important;
+        }
+
+        /* Stili per i messaggi flash */
+        .messages {
+            position: fixed; /* Posizionamento fisso rispetto al viewport */
+            top: 60px; /* Sotto la navbar superiore */
+            right: 20px; /* Allineato a destra */
+            width: auto; /* Larghezza automatica in base al contenuto */
+            max-width: 300px; /* Limita la larghezza massima */
+            z-index: 1040; /* Sopra la navbar */
+            text-align: right; /* Allinea il testo a destra */
+        }
+        .alert {
+            border-radius: 8px;
+            margin-bottom: 10px; /* Spazio tra gli alert se ce ne sono più di uno */
+            padding: 10px 15px; /* Padding ridotto per un aspetto più compatto */
+            font-size: 0.85em; /* Font più piccolo per l'alert */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); /* Ombra leggera */
+            display: inline-block; /* Permette all'alert di adattarsi al contenuto e allinearsi a destra */
+            text-align: center; /* Centra il testo dell'alert */
+        }
+        .alert .btn-close {
+            font-size: 0.8em; /* Riduci la dimensione del pulsante di chiusura */
+            padding: 0.2rem 0.2rem; /* Riduci il padding del pulsante di chiusura */
+        }
+
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+                padding-top: 0; /* Rimuovi padding top su mobile, la navbar non è fissa */
+            }
+            #top-navbar {
+                position: static; /* La navbar non è più fissa su mobile */
+            }
+            #sidebar {
+                width: 100%;
+                height: auto;
+                border-radius: 0;
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+                position: static; /* La sidebar non è più sticky su mobile */
+                top: auto;
+            }
+            #content {
+                margin: 10px;
+                padding: 20px;
+                min-height: auto;
+            }
+            .messages {
+                position: static; /* Rimuovi fixed positioning su mobile */
+                width: 100%;
+                max-width: none;
+                margin-top: 10px;
+                text-align: center; /* Centra gli alert su mobile */
+                right: auto;
+                top: auto;
+            }
+            .alert {
+                display: block; /* Gli alert occupano tutta la larghezza su mobile */
+                margin-left: auto;
+                margin-right: auto;
+            }
+        }
+    </style>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    {# Questo blocco è per contenuti head aggiuntivi come stili specifici della pagina o meta tag #}
+    {% block head_extra %}{% endblock head_extra %}
+</head>
+<body>
+    <!-- Nuovo menu orizzontale fisso in alto -->
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top" id="top-navbar"> {# Rimosso bg-dark #}
+        <div class="container-fluid">
+            <a class="navbar-brand resilienza-title" href="{{ url_for('appBT.index') }}">Resilienza</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <span class="navbar-text">
+                            Utente: <strong>{{ session.username if session.username else 'Ospite' }}</strong>
+                        </span>
+                    </li>
+                    <li class="nav-item">
+                        <span class="navbar-text">
+                            Ruolo: <strong>{{ session.user_role_descr if session.user_role_descr else 'Sconosciuto' }}</strong>
+                        </span>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link btn btn-danger btn-sm" href="{{ url_for('appBT.logout') }}">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    {# La sidebar è sempre visibile e non controllata da hide_sidebar #}
+    <div id="sidebar">
+        {# <h4 class="text-center mb-4">Resilienza App</h4> #}
+        <ul class="nav flex-column">
+            {% for parent_item in menu_data %}
+                <li class="nav-item">
+                    {% if parent_item.figli %}
+                        {# Voce padre con figli #}
+                        <a class="nav-link" href="#submenu-{{ parent_item.id }}" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="submenu-{{ parent_item.id }}">
+                            <i class="{{ parent_item.icon }}"></i> {{ parent_item.label }} <i class="fas fa-chevron-down ms-auto"></i>
+                        </a>
+                        <div class="collapse" id="submenu-{{ parent_item.id }}">
+                            <ul class="nav flex-column ms-3">
+                                {% for child_item in parent_item.figli %}
+                                    <li class="nav-item">
+                                        {% if child_item.nipoti %}
+                                            {# Voce figlio con nipoti #}
+                                            <a class="nav-link" href="#subsubmenu-{{ child_item.id }}" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="subsubmenu-{{ child_item.id }}">
+                                                <i class="{{ child_item.icon }}"></i> {{ child_item.label }} <i class="fas fa-chevron-down ms-auto"></i>
+                                            </a>
+                                            <div class="collapse" id="subsubmenu-{{ child_item.id }}">
+                                                <ul class="nav flex-column ms-3">
+                                                    {% for grandchild_item in child_item.nipoti %}
+                                                        {# Voce nipote #}
+                                                        <li class="nav-item">
+                                                            <a class="nav-link" href="{{ grandchild_item.link }}">
+                                                                <i class="{{ grandchild_item.icon }}"></i> {{ grandchild_item.label }}
+                                                            </a>
+                                                        </li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                        {% else %}
+                                            {# Voce figlio senza nipoti #}
+                                            <a class="nav-link" href="{{ child_item.link }}">
+                                                <i class="{{ child_item.icon }}"></i> {{ child_item.label }}
+                                            </a>
+                                        {% endif %}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% else %}
+                        {# Voce singola (senza figli) #}
+                        <a class="nav-link" href="{{ parent_item.link }}">
+                            <i class="{{ parent_item.icon }}"></i> {{ parent_item.label }}
+                        </a>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+
+        {# Rimosso il blocco user-info da qui #}
+    </div>
+
+    <div id="content">
+        {% block content %}
+            {# Contenuto di default per index.html se nessun template lo estende #}
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="messages mt-4 w-100">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} flash-message" role="alert">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <h1>benvenuto nell'applicazione Resilienza!</h1>
+            <p>Questo è il contenuto principale della tua applicazione.</p>
+            {# Rimosse le stringhe richieste dall'utente #}
+        {% endblock content %} {# MODIFICATO: Aggiunto "content" qui #}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const darkModeToggle = document.getElementById('dark-mode-toggle');
+            if (darkModeToggle) {
+                darkModeToggle.addEventListener('click', function() {
+                    document.body.classList.toggle('dark-mode');
+                    if (document.body.classList.contains('dark-mode')) {
+                        localStorage.setItem('dark-mode', 'enabled');
+                    } else {
+                        localStorage.setItem('dark-mode', 'disabled');
+                    }
+                });
+            }
+
+            if (localStorage.getItem('dark-mode') === 'enabled') {
+                document.body.classList.add('dark-mode');
+            }
+        });
+    </script>
+    {% block scripts %}{% endblock scripts %} {# MODIFICATO: Aggiunto "scripts" qui #}
+</body>
+</html>

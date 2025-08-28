@@ -1,0 +1,369 @@
+{% extends "index.html" %}
+
+{% block title %}Gestione Domande{% endblock title %}
+
+{% block head_extra %}
+    <!-- Aggiungi qui i tuoi stili CSS personalizzati se presenti -->
+    <style>
+        /* Stile per ridurre la dimensione del font nella tabella delle domande */
+        #domandeTable th,
+        #domandeTable td {
+            font-size: 0.85em; /* Puoi regolare questo valore (es. 0.9em, 0.8em, small, x-small) */
+        }
+    </style>
+{% endblock head_extra %}
+
+{% block content %}
+<div class="container mt-4">
+    {# Contenitore per i messaggi flash gestiti da JavaScript #}
+    <div class="messages mb-3"></div>
+
+    <div class="d-flex justify-content-end align-items-center mb-4">
+        <a href="{{ url_for('appBT.index') }}" class="btn btn-info btn-sm">
+            <i class="fas fa-arrow-left me-1"></i> Torna alla Home
+        </a>
+    </div>
+
+    <!-- Form per Inserimento/Modifica -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Aggiungi / Modifica Domanda</h5>
+        </div>
+        <div class="card-body">
+            <form id="domandaForm">
+                <input type="hidden" id="domandaId">
+                <input type="hidden" id="csrf_token" name="csrf_token" value="{{ csrf_token }}">
+                
+                <div class="mb-3">
+                    <label for="idDriver" class="form-label">Driver</label>
+                    <select class="form-select" id="idDriver" required>
+                        <!-- Le opzioni saranno caricate via JavaScript -->
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="descr" class="form-label">Descrizione Domanda</label>
+                    <textarea class="form-control" id="descr" rows="3" required></textarea>
+                </div>
+                
+                <button type="submit" class="btn btn-success me-2">Salva</button>
+                <button type="button" class="btn btn-secondary" id="resetForm">Annulla</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabella di Visualizzazione -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">Elenco Domande</h5>
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label for="filterDriver" class="form-label">Filtra per Driver:</label>
+                <select class="form-select" id="filterDriver">
+                    <!-- Le opzioni saranno caricate via JavaScript -->
+                </select>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover" id="domandeTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Driver (ID)</th>
+                            <th>Driver</th>
+                            <th>Descrizione</th>
+                            <th>Ultima Modifica</th>
+                            <th>Modificato Da</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody id="domandeTableBody">
+                        <!-- I dati delle domande verranno caricati qui via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("DOM completamente caricato per domanda.html");
+
+        const domandaForm = document.getElementById('domandaForm');
+        const domandaIdInput = document.getElementById('domandaId');
+        const idDriverSelect = document.getElementById('idDriver');
+        const descrInput = document.getElementById('descr');
+        const domandeTableBody = document.getElementById('domandeTableBody');
+        const resetFormBtn = document.getElementById('resetForm');
+        const filterDriverSelect = document.getElementById('filterDriver');
+        
+        // Nuovo log per verificare se filterDriverSelect è stato trovato
+        console.log("Elemento filterDriverSelect:", filterDriverSelect);
+
+        const csrfToken = document.getElementById('csrf_token').value;
+        console.log("CSRF Token recuperato:", csrfToken ? "presente" : "assente");
+
+        const API_BASE_URL = window.location.origin;
+        const DOMANDA_API_URL = `${API_BASE_URL}/api/domanda/`;
+        const DRIVER_API_URL_FOR_DROPDOWN = `${API_BASE_URL}/api/domanda/drivers`; // Endpoint per i driver nel controller domanda
+
+        // Funzione per mostrare i messaggi flash (dovrebbe essere già in index.html, ma la definiamo per sicurezza)
+        function showFlashMessage(message, category = 'info') {
+            const messagesContainer = document.querySelector('.messages');
+            if (!messagesContainer) {
+                console.error("Contenitore messaggi flash non trovato. Impossibile mostrare il messaggio:", message);
+                return;
+            }
+
+            const alertDiv = document.createElement('div');
+            alertDiv.classList.add('alert', `alert-${category}`, 'alert-dismissible', 'fade', 'show');
+            alertDiv.setAttribute('role', 'alert');
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            messagesContainer.appendChild(alertDiv);
+
+            setTimeout(() => {
+                const bsAlert = new bootstrap.Alert(alertDiv);
+                bsAlert.close();
+            }, 5000);
+        }
+
+        // Funzione per formattare le date (dovrebbe essere già in index.html, ma la definiamo per sicurezza)
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const options = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+            try {
+                return new Date(dateString).toLocaleString('it-IT', options);
+            } catch (e) {
+                console.error("Errore nella formattazione della data:", dateString, e);
+                return dateString;
+            }
+        }
+
+        async function loadDriversForDropdowns() {
+            console.log("Tentativo di caricare i driver per i dropdown domanda da:", DRIVER_API_URL_FOR_DROPDOWN);
+            try {
+                const response = await fetch(DRIVER_API_URL_FOR_DROPDOWN);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+                }
+                const drivers = await response.json();
+                
+                // Popola il dropdown del form di aggiunta/modifica
+                idDriverSelect.innerHTML = '<option value="">Seleziona un Driver</option>'; // Opzione di default
+                drivers.forEach(driver => {
+                    const option = document.createElement('option');
+                    option.value = driver.id;
+                    option.textContent = driver.descr;
+                    idDriverSelect.appendChild(option);
+                });
+                console.log("Dropdown driver del form popolato con successo.");
+
+                // Popola il dropdown del filtro
+                filterDriverSelect.innerHTML = '<option value="">Tutti i Driver</option>'; // Opzione di default per il filtro
+                drivers.forEach(driver => {
+                    const option = document.createElement('option');
+                    option.value = driver.id;
+                    option.textContent = driver.descr;
+                    filterDriverSelect.appendChild(option);
+                });
+                console.log("Dropdown driver del filtro popolato con successo.");
+
+            } catch (error) {
+                console.error("Errore nel caricamento dei driver per i dropdown:", error);
+                showFlashMessage(`Errore nel caricamento dei driver: ${error.message}`, 'danger');
+            }
+        }
+
+        async function loadDomande() {
+            console.log("Tentativo di caricare le domande da:", DOMANDA_API_URL);
+            const selectedDriverId = filterDriverSelect.value;
+            const numericDriverId = parseInt(selectedDriverId); // Converti in intero
+            console.log("Valore selezionato nel filtro Driver (stringa):", selectedDriverId); // Log del valore stringa
+            console.log("Valore selezionato nel filtro Driver (numerico):", numericDriverId); // Log del valore numerico
+
+            let url = DOMANDA_API_URL;
+            // Verifica se il valore numerico è un numero valido e maggiore di 0 (per escludere "Tutti i Driver" o errori di parsing)
+            if (!isNaN(numericDriverId) && numericDriverId > 0) { 
+                url += `?id_driver=${numericDriverId}`;
+                console.log("Filtro per driver applicato. URL:", url);
+            } else {
+                console.log("Nessun filtro driver valido selezionato o 'Tutti i Driver'. Caricamento tutte le domande. URL:", url);
+            }
+
+            try {
+                const response = await fetch(url);
+                console.log("Risposta API ricevuta (loadDomande):", response.status, response.statusText);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error("Errore HTTP nel caricamento domande:", response.status, errorText);
+                    throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+                }
+                const domande = await response.json();
+                console.log("Dati domande ricevuti:", domande);
+
+                domandeTableBody.innerHTML = '';
+                if (domande.length === 0) {
+                    const row = domandeTableBody.insertRow();
+                    const cell = row.insertCell(0);
+                    cell.colSpan = 7; // Numero di colonne nella tabella
+                    cell.textContent = "Nessuna domanda trovata.";
+                    cell.classList.add('text-center', 'text-muted');
+                } else {
+                    domande.forEach(domanda => {
+                        const row = domandeTableBody.insertRow();
+                        row.insertCell(0).textContent = domanda.id;
+                        row.insertCell(1).textContent = domanda.id_driver;
+                        row.insertCell(2).textContent = domanda.driver_descr || ''; // Mostra la descrizione del driver
+                        row.insertCell(3).textContent = domanda.descr;
+                        row.insertCell(4).textContent = formatDate(domanda.data_ultima_modifica);
+                        row.insertCell(5).textContent = domanda.modificato_da || '';
+
+                        const actionsCell = row.insertCell(6);
+                        actionsCell.classList.add('d-flex', 'gap-1', 'justify-content-center');
+
+                        const editBtn = document.createElement('button');
+                        editBtn.textContent = 'Modifica';
+                        editBtn.classList.add('btn', 'btn-warning', 'btn-sm');
+                        editBtn.addEventListener('click', () => editDomanda(domanda));
+
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.textContent = 'Elimina';
+                        deleteBtn.classList.add('btn', 'btn-danger', 'btn-sm');
+                        deleteBtn.addEventListener('click', () => deleteDomanda(domanda.id));
+
+                        actionsCell.appendChild(editBtn);
+                        actionsCell.appendChild(deleteBtn);
+                    });
+                }
+            } catch (error) {
+                console.error("Errore nel caricamento delle domande (catch block):", error);
+                showFlashMessage(`Errore nel caricamento delle domande: ${error.message}`, 'danger');
+            }
+        }
+
+        function editDomanda(domanda) {
+            console.log("Modifica domanda:", domanda);
+            domandaIdInput.value = domanda.id;
+            idDriverSelect.value = domanda.id_driver;
+            descrInput.value = domanda.descr;
+        }
+
+        domandaForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            console.log("Form domanda sottomesso.");
+            const id = domandaIdInput.value;
+            const idDriver = idDriverSelect.value;
+            const descr = descrInput.value;
+
+            if (!idDriver || !descr) {
+                showFlashMessage("Selezionare un Driver e inserire una Descrizione sono obbligatori.", "warning");
+                return;
+            }
+
+            let url = DOMANDA_API_URL;
+            let method = 'POST';
+            let successMessage = 'Domanda creata correttamente.'; 
+            let errorMessage = 'Errore nella creazione della domanda.';
+            let bodyData = { id_driver: parseInt(idDriver), descr: descr };
+
+            if (id) {
+                url = `${DOMANDA_API_URL}${id}`;
+                method = 'PUT';
+                successMessage = 'Domanda aggiornata correttamente.'; 
+                errorMessage = 'Errore nell\'aggiornamento della domanda.';
+                bodyData = { id_driver: parseInt(idDriver), descr: descr };
+            }
+            console.log(`Invio richiesta ${method} a ${url} con dati:`, bodyData);
+
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify(bodyData)
+                });
+
+                console.log("Risposta API ricevuta per submit domanda:", response);
+                const result = await response.json();
+                console.log("Risultato JSON della risposta:", result);
+
+                if (response.ok) {
+                    showFlashMessage(successMessage, 'success');
+                    domandaForm.reset();
+                    domandaIdInput.value = '';
+                    loadDomande(); // Ricarica la tabella
+                } else {
+                    showFlashMessage(`${errorMessage} ${result.error || ''}`, 'danger');
+                }
+            } catch (error) {
+                console.error("Errore nella richiesta API domanda (catch block):", error);
+                showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
+            }
+        });
+
+        async function deleteDomanda(id) {
+            if (!confirm('Sei sicuro di voler eliminare questa domanda? Questa operazione è irreversibile!')) {
+                return;
+            }
+            console.log("Tentativo di eliminare domanda con ID:", id);
+
+            try {
+                const response = await fetch(`${DOMANDA_API_URL}${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': csrfToken
+                    }
+                });
+
+                console.log("Risposta API ricevuta per delete domanda:", response);
+                const result = await response.json();
+                console.log("Risultato JSON della risposta delete:", result);
+
+                if (response.ok) {
+                    showFlashMessage('Domanda eliminata correttamente.', 'success'); 
+                    loadDomande();
+                } else {
+                    showFlashMessage(`Errore nell\\'eliminazione della domanda: ${result.error || ''}`, 'danger');
+                }
+            } catch (error) {
+                console.error("Errore nella richiesta API delete domanda (catch block):", error);
+                showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
+            }
+        }
+
+        resetFormBtn.addEventListener('click', () => {
+            console.log("Resetting domanda form.");
+            domandaForm.reset();
+            domandaIdInput.value = '';
+        });
+
+        // Carica i driver per i dropdown e poi le domande al caricamento della pagina
+        // Esegui queste funzioni e poi attacca l'event listener
+        loadDriversForDropdowns().then(() => {
+            loadDomande();
+            // Event listener per il cambio di selezione del driver nel filtro
+            // Attaccato dopo che il dropdown è stato popolato
+            if (filterDriverSelect) {
+                filterDriverSelect.addEventListener('change', function() {
+                    console.log("!!! EVENTO DI CAMBIO RILEVATO SUL FILTRO DRIVER !!!"); 
+                    console.log("Evento 'change' sul filtro Driver rilevato."); // Nuovo log per l'evento
+                    loadDomande();
+                });
+                console.log("Event listener 'change' attaccato a filterDriverSelect.");
+            } else {
+                console.error("Errore: filterDriverSelect non trovato dopo il popolamento.");
+            }
+        });
+    });
+</script>
+{% endblock scripts %}

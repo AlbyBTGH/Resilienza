@@ -1,0 +1,77 @@
+{% extends "index.html" %}
+
+{% block title %}Caricamento Massivo Domande{% endblock title %}
+
+{% block content %}
+    <div class="container-fluid mt-5">
+        <h2>Caricamento Massivo Domande</h2>
+        <p>Carica un file Excel per inserire rapidamente nuove domande. Il file deve avere le seguenti colonne:</p>
+        <div class="alert alert-info" role="alert">
+            **id_driver** (Integer) | **descrizione** (Text)
+        </div>
+        <div class="card mt-4">
+            <div class="card-header">
+                Carica il file
+            </div>
+            <div class="card-body">
+                <form id="upload-form" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="file" class="form-label">Seleziona un file Excel (.xls, .xlsx):</label>
+                        <input type="file" class="form-control" id="file" name="file" required accept=".xls,.xlsx">
+                    </div>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="btn btn-primary">Carica</button>
+                    <a href="{{ url_for('static', filename='template_domande.xlsx') }}" download class="btn btn-secondary ms-2">
+                        Scarica Modello
+                    </a>
+                </form>
+                <div id="upload-status" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const uploadForm = document.getElementById('upload-form');
+        const uploadStatus = document.getElementById('upload-status');
+
+        uploadForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const fileInput = document.getElementById('file');
+            if (fileInput.files.length === 0) {
+                uploadStatus.innerHTML = '<div class="alert alert-danger">Seleziona un file da caricare.</div>';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            // Recupera il token CSRF dal campo nascosto e lo aggiunge a FormData
+            const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+            formData.append('csrf_token', csrfToken);
+
+            uploadStatus.innerHTML = '<div class="alert alert-info">Caricamento in corso...</div>';
+
+            try {
+                const response = await fetch('/api/domande/upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    uploadStatus.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+                } else {
+                    uploadStatus.innerHTML = `<div class="alert alert-danger">Errore: ${data.error}</div>`;
+                }
+            } catch (error) {
+                console.error('Errore:', error);
+                uploadStatus.innerHTML = `<div class="alert alert-danger">Errore di rete o del server.</div>`;
+            }
+        });
+    });
+</script>
+{% endblock scripts %}

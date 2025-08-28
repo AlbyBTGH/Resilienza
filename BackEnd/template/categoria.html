@@ -1,0 +1,337 @@
+<!-- templates/categoria.html -->
+{% extends "index.html" %}
+
+{% block title %}Gestione Categorie{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    {# Contenitore per i messaggi flash gestiti da JavaScript #}
+    <div class="messages mb-3"></div>
+
+    <div class="d-flex justify-content-end align-items-center mb-4">
+        <a href="{{ url_for('appBT.index') }}" class="btn btn-info btn-sm">
+            <i class="fas fa-arrow-left me-1"></i> Torna alla Home
+        </a>
+    </div>
+
+    <!-- Form per Inserimento/Modifica -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Aggiungi / Modifica Categoria</h5>
+        </div>
+        <div class="card-body">
+            <form id="categoriaForm">
+                <input type="hidden" id="categoriaId">
+                <input type="hidden" id="csrf_token" name="csrf_token" value="{{ csrf_token }}">
+                
+                <div class="mb-3">
+                    <label for="idAmbito" class="form-label">Ambito</label>
+                    <select class="form-select" id="idAmbito" required>
+                        <!-- Le opzioni saranno caricate via JavaScript -->
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="descr" class="form-label">Descrizione</label>
+                    <input type="text" class="form-control" id="descr" required>
+                </div>
+                <div class="mb-3">
+                    <label for="tipoCategoria" class="form-label">Tipo Categoria (Opzionale)</label>
+                    <input type="text" class="form-control" id="tipoCategoria">
+                </div>
+                {# Rimosso il campo Note #}
+                {# Rimosso il campo Acronimo #}
+                
+                <button type="submit" class="btn btn-success me-2">Salva</button>
+                <button type="button" class="btn btn-secondary" id="resetForm">Annulla</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabella di Visualizzazione -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">Elenco Categorie</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Ambito (ID)</th>
+                            <th>Ambito</th>
+                            <th>Descrizione</th>
+                            <th>Tipo Categoria</th> {# Aggiunto: Tipo Categoria #}
+                            <th>Ultima Modifica</th>
+                            <th>Modificato Da</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody id="categorieTableBody">
+                        <!-- I dati delle categorie verranno caricati qui via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("DOM completamente caricato per categoria.html");
+
+        const categoriaForm = document.getElementById('categoriaForm');
+        const categoriaIdInput = document.getElementById('categoriaId');
+        const idAmbitoSelect = document.getElementById('idAmbito');
+        const descrInput = document.getElementById('descr');
+        const tipoCategoriaInput = document.getElementById('tipoCategoria'); // Aggiunto: tipoCategoriaInput
+        // Rimosso: const acronimoInput = document.getElementById('acronimo');
+        // Rimosso: const noteInput = document.getElementById('note');
+        const categorieTableBody = document.getElementById('categorieTableBody');
+        const resetFormBtn = document.getElementById('resetForm');
+
+        const csrfToken = document.getElementById('csrf_token').value;
+        console.log("CSRF Token recuperato:", csrfToken ? "presente" : "assente");
+
+        const API_BASE_URL = window.location.origin;
+        const CATEGORIA_API_URL = `${API_BASE_URL}/api/categoria/`;
+        const AMBITO_API_URL = `${API_BASE_URL}/api/categoria/ambiti`;
+
+        function showFlashMessage(message, category = 'info') {
+            const messagesContainer = document.querySelector('.messages');
+            if (!messagesContainer) {
+                console.error("Contenitore messaggi flash non trovato. Impossibile mostrare il messaggio:", message);
+                return;
+            }
+
+            const alertDiv = document.createElement('div');
+            alertDiv.classList.add('alert', `alert-${category}`, 'alert-dismissible', 'fade', 'show');
+            alertDiv.setAttribute('role', 'alert');
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            messagesContainer.appendChild(alertDiv);
+
+            setTimeout(() => {
+                const bsAlert = new bootstrap.Alert(alertDiv);
+                bsAlert.close();
+            }, 5000);
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const options = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+            try {
+                return new Date(dateString).toLocaleString('it-IT', options);
+            } catch (e) {
+                console.error("Errore nella formattazione della data:", dateString, e);
+                return dateString;
+            }
+        }
+
+        async function loadAmbitiForDropdown() {
+            console.log("Tentativo di caricare gli ambiti per il dropdown da:", AMBITO_API_URL);
+            try {
+                const response = await fetch(AMBITO_API_URL);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+                }
+                const ambiti = await response.json();
+                
+                idAmbitoSelect.innerHTML = '<option value="">Seleziona un Ambito</option>'; // Opzione di default
+                ambiti.forEach(ambito => {
+                    const option = document.createElement('option');
+                    option.value = ambito.id;
+                    option.textContent = ambito.descrizione;
+                    idAmbitoSelect.appendChild(option);
+                });
+                console.log("Dropdown ambiti popolato con successo.");
+            } catch (error) {
+                console.error("Errore nel caricamento degli ambiti per il dropdown:", error);
+                showFlashMessage(`Errore nel caricamento degli ambiti: ${error.message}`, 'danger');
+            }
+        }
+
+        async function loadCategorie() {
+            console.log("Tentativo di caricare le categorie da:", CATEGORIA_API_URL);
+            const selectedAmbitoId = idAmbitoSelect.value;
+            let url = CATEGORIA_API_URL;
+            if (selectedAmbitoId) {
+                url += `?id_ambito=${selectedAmbitoId}`;
+                console.log("Filtro per ambito applicato. URL:", url);
+            } else {
+                console.log("Nessun filtro ambito, caricamento tutte le categorie.");
+            }
+
+            try {
+                const response = await fetch(url);
+                console.log("Risposta API ricevuta (loadCategorie):", response);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error("Errore HTTP nel caricamento categorie:", response.status, errorText);
+                    throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+                }
+                const categorie = await response.json();
+                console.log("Dati categorie ricevuti:", categorie);
+
+                categorieTableBody.innerHTML = '';
+                if (categorie.length === 0) {
+                    const row = categorieTableBody.insertRow();
+                    const cell = row.insertCell(0);
+                    cell.colSpan = 8; // Aggiornato il colspan per il numero di colonne
+                    cell.textContent = "Nessuna categoria trovata.";
+                    cell.classList.add('text-center', 'text-muted');
+                } else {
+                    categorie.forEach(categoria => {
+                        const row = categorieTableBody.insertRow();
+                        row.insertCell(0).textContent = categoria.id;
+                        row.insertCell(1).textContent = categoria.id_ambito;
+                        row.insertCell(2).textContent = categoria.ambito_descrizione || ''; // Mostra la descrizione dell'ambito
+                        row.insertCell(3).textContent = categoria.descr;
+                        row.insertCell(4).textContent = categoria.tipo_categoria || ''; // Aggiunto: tipo_categoria
+                        row.insertCell(5).textContent = formatDate(categoria.data_ultima_modifica);
+                        row.insertCell(6).textContent = categoria.modificato_da || '';
+
+                        const actionsCell = row.insertCell(7); // Aggiornato l'indice della cella azioni
+                        actionsCell.classList.add('d-flex', 'gap-1', 'justify-content-center');
+
+                        const editBtn = document.createElement('button');
+                        editBtn.textContent = 'Modifica';
+                        editBtn.classList.add('btn', 'btn-warning', 'btn-sm');
+                        editBtn.addEventListener('click', () => editCategoria(categoria));
+
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.textContent = 'Elimina';
+                        deleteBtn.classList.add('btn', 'btn-danger', 'btn-sm');
+                        deleteBtn.addEventListener('click', () => deleteCategoria(categoria.id));
+
+                        actionsCell.appendChild(editBtn);
+                        actionsCell.appendChild(deleteBtn);
+                    });
+                }
+            } catch (error) {
+                console.error("Errore nel caricamento delle categorie (catch block):", error);
+                showFlashMessage(`Errore nel caricamento delle categorie: ${error.message}`, 'danger');
+            }
+        }
+
+        function editCategoria(categoria) {
+            console.log("Modifica categoria:", categoria);
+            categoriaIdInput.value = categoria.id;
+            idAmbitoSelect.value = categoria.id_ambito;
+            descrInput.value = categoria.descr;
+            tipoCategoriaInput.value = categoria.tipo_categoria || ''; // Aggiunto: tipo_categoria
+            // Rimosso: acronimoInput.value = categoria.acronimo || '';
+            // Rimosso: noteInput.value = categoria.note || '';
+        }
+
+        categoriaForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            console.log("Form categoria sottomesso.");
+            const id = categoriaIdInput.value;
+            const idAmbito = idAmbitoSelect.value;
+            const descr = descrInput.value;
+            const tipoCategoria = tipoCategoriaInput.value; // Aggiunto: tipoCategoria
+            // Rimosso: const acronimo = acronimoInput.value;
+            // Rimosso: const note = noteInput.value;
+
+            if (!idAmbito) {
+                showFlashMessage("Selezionare un Ambito è obbligatorio.", "warning");
+                return;
+            }
+
+            let url = CATEGORIA_API_URL;
+            let method = 'POST';
+            let successMessage = 'Categoria creata correttamente.'; 
+            let errorMessage = 'Errore nella creazione della categoria.';
+            // Modifica qui: Rimosso 'note' e 'acronimo', aggiunto 'tipo_categoria'
+            let bodyData = { id_ambito: parseInt(idAmbito), descr: descr, tipo_categoria: tipoCategoria };
+
+            if (id) {
+                url = `${CATEGORIA_API_URL}${id}`;
+                method = 'PUT';
+                successMessage = 'Categoria aggiornata correttamente.'; 
+                errorMessage = 'Errore nell\'aggiornamento della categoria.';
+                // Modifica qui: Rimosso 'note' e 'acronimo', aggiunto 'tipo_categoria'
+                bodyData = { id_ambito: parseInt(idAmbito), descr: descr, tipo_categoria: tipoCategoria };
+            }
+            console.log(`Invio richiesta ${method} a ${url} con dati:`, bodyData);
+
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify(bodyData)
+                });
+
+                console.log("Risposta API ricevuta per submit categoria:", response);
+                const result = await response.json();
+                console.log("Risultato JSON della risposta:", result);
+
+                if (response.ok) {
+                    showFlashMessage(successMessage, 'success');
+                    categoriaForm.reset();
+                    categoriaIdInput.value = '';
+                    loadCategorie(); // Ricarica la tabella
+                } else {
+                    showFlashMessage(`${errorMessage} ${result.error || ''}`, 'danger');
+                }
+            } catch (error) {
+                console.error("Errore nella richiesta API categoria (catch block):", error);
+                showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
+            }
+        });
+
+        async function deleteCategoria(id) {
+            if (!confirm('Sei sicuro di voler eliminare questa categoria? Questa operazione è irreversibile!')) {
+                return;
+            }
+            console.log("Tentativo di eliminare categoria con ID:", id);
+
+            try {
+                const response = await fetch(`${CATEGORIA_API_URL}${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': csrfToken
+                    }
+                });
+
+                console.log("Risposta API ricevuta per delete categoria:", response);
+                const result = await response.json();
+                console.log("Risultato JSON della risposta delete:", result);
+
+                if (response.ok) {
+                    showFlashMessage('Categoria eliminata correttamente.', 'success'); 
+                    loadCategorie();
+                } else {
+                    showFlashMessage(`Errore nell\\'eliminazione della categoria: ${result.error || ''}`, 'danger');
+                }
+            } catch (error) {
+                console.error("Errore nella richiesta API delete categoria (catch block):", error);
+                showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
+            }
+        }
+
+        resetFormBtn.addEventListener('click', () => {
+            console.log("Resetting categoria form.");
+            categoriaForm.reset();
+            categoriaIdInput.value = '';
+        });
+
+        // Event listener per il cambio di selezione dell'ambito
+        idAmbitoSelect.addEventListener('change', loadCategorie);
+
+        // Carica gli ambiti per il dropdown e poi le categorie al caricamento della pagina
+        loadAmbitiForDropdown();
+        loadCategorie();
+    });
+</script>
+{% endblock %}

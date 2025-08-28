@@ -1,0 +1,326 @@
+{% extends "index.html" %}
+
+{% block title %}Gestione Driver{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    {# Contenitore per i messaggi flash gestiti da JavaScript #}
+    <div class="messages mb-3"></div>
+
+    <div class="d-flex justify-content-end align-items-center mb-4">
+        <a href="{{ url_for('appBT.index') }}" class="btn btn-info btn-sm">
+            <i class="fas fa-arrow-left me-1"></i> Torna alla Home
+        </a>
+    </div>
+
+    <!-- Form per Inserimento/Modifica -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Aggiungi / Modifica Driver</h5>
+        </div>
+        <div class="card-body">
+            <form id="driverForm">
+                <input type="hidden" id="driverId">
+                <input type="hidden" id="csrf_token" name="csrf_token" value="{{ csrf_token }}">
+                
+                <div class="mb-3">
+                    <label for="idCategoria" class="form-label">Categoria</label>
+                    <select class="form-select" id="idCategoria" required>
+                        <!-- Le opzioni saranno caricate via JavaScript -->
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="descr" class="form-label">Descrizione</label>
+                    <input type="text" class="form-control" id="descr" required>
+                </div>
+                
+                <button type="submit" class="btn btn-success me-2">Salva</button>
+                <button type="button" class="btn btn-secondary" id="resetForm">Annulla</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabella di Visualizzazione -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">Elenco Driver</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover" id="driversTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Categoria (ID)</th>
+                            <th>Categoria</th>
+                            <th>Descrizione</th>
+                            <th>Ultima Modifica</th>
+                            <th>Modificato Da</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody id="driversTableBody">
+                        <!-- I dati dei driver verranno caricati qui via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("DOM completamente caricato per driver.html");
+
+        const driverForm = document.getElementById('driverForm');
+        const driverIdInput = document.getElementById('driverId');
+        const idCategoriaSelect = document.getElementById('idCategoria');
+        const descrInput = document.getElementById('descr');
+        const driversTableBody = document.getElementById('driversTableBody');
+        const resetFormBtn = document.getElementById('resetForm');
+
+        const csrfToken = document.getElementById('csrf_token').value;
+        console.log("CSRF Token recuperato:", csrfToken ? "presente" : "assente");
+
+        const API_BASE_URL = window.location.origin;
+        const DRIVER_API_URL = `${API_BASE_URL}/api/driver/`;
+        const CATEGORIA_API_URL_FOR_DROPDOWN = `${API_BASE_URL}/api/driver/categorie`;
+
+        // Funzione per mostrare i messaggi flash (dovrebbe essere già in index.html, ma la definiamo per sicurezza)
+        function showFlashMessage(message, category = 'info') {
+            const messagesContainer = document.querySelector('.messages');
+            if (!messagesContainer) {
+                console.error("Contenitore messaggi flash non trovato. Impossibile mostrare il messaggio:", message);
+                return;
+            }
+
+            const alertDiv = document.createElement('div');
+            alertDiv.classList.add('alert', `alert-${category}`, 'alert-dismissible', 'fade', 'show');
+            alertDiv.setAttribute('role', 'alert');
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            messagesContainer.appendChild(alertDiv);
+
+            setTimeout(() => {
+                const bsAlert = new bootstrap.Alert(alertDiv);
+                bsAlert.close();
+            }, 5000);
+        }
+
+        // Funzione per formattare le date (dovrebbe essere già in index.html, ma la definiamo per sicurezza)
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const options = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+            try {
+                return new Date(dateString).toLocaleString('it-IT', options);
+            } catch (e) {
+                console.error("Errore nella formattazione della data:", dateString, e);
+                return dateString;
+            }
+        }
+
+        async function loadCategorieForDropdown() {
+            console.log("Tentativo di caricare le categorie per il dropdown driver da:", CATEGORIA_API_URL_FOR_DROPDOWN);
+            try {
+                const response = await fetch(CATEGORIA_API_URL_FOR_DROPDOWN);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+                }
+                const categorie = await response.json();
+                
+                idCategoriaSelect.innerHTML = '<option value="">Seleziona una Categoria</option>'; // Opzione di default
+                categorie.forEach(categoria => {
+                    const option = document.createElement('option');
+                    option.value = categoria.id;
+                    option.textContent = categoria.descr;
+                    idCategoriaSelect.appendChild(option);
+                });
+                console.log("Dropdown categorie popolato con successo.");
+            } catch (error) {
+                console.error("Errore nel caricamento delle categorie per il dropdown:", error);
+                showFlashMessage(`Errore nel caricamento delle categorie: ${error.message}`, 'danger');
+            }
+        }
+
+        async function loadDrivers() {
+            console.log("Tentativo di caricare i driver da:", DRIVER_API_URL);
+            const selectedCategoriaId = idCategoriaSelect.value;
+            let url = DRIVER_API_URL;
+            if (selectedCategoriaId) {
+                url += `?id_categoria=${selectedCategoriaId}`;
+                console.log("Filtro per categoria applicato. URL:", url);
+            } else {
+                console.log("Nessun filtro categoria, caricamento tutti i driver.");
+            }
+
+            try {
+                const response = await fetch(url);
+                console.log("Risposta API ricevuta (loadDrivers):", response);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error("Errore HTTP nel caricamento driver:", response.status, errorText);
+                    throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+                }
+                const drivers = await response.json();
+                console.log("Dati driver ricevuti:", drivers);
+
+                driversTableBody.innerHTML = '';
+                if (drivers.length === 0) {
+                    const row = driversTableBody.insertRow();
+                    const cell = row.insertCell(0);
+                    cell.colSpan = 7; // Numero di colonne nella tabella
+                    cell.textContent = "Nessun driver trovato.";
+                    cell.classList.add('text-center', 'text-muted');
+                } else {
+                    drivers.forEach(driver => {
+                        const row = driversTableBody.insertRow();
+                        row.insertCell(0).textContent = driver.id;
+                        row.insertCell(1).textContent = driver.id_categoria;
+                        row.insertCell(2).textContent = driver.categoria_descr || ''; // Mostra la descrizione della categoria
+                        row.insertCell(3).textContent = driver.descr;
+                        row.insertCell(4).textContent = formatDate(driver.data_ultima_modifica);
+                        row.insertCell(5).textContent = driver.modificato_da || '';
+
+                        const actionsCell = row.insertCell(6);
+                        actionsCell.classList.add('d-flex', 'gap-1', 'justify-content-center');
+
+                        const editBtn = document.createElement('button');
+                        editBtn.textContent = 'Modifica';
+                        editBtn.classList.add('btn', 'btn-warning', 'btn-sm');
+                        editBtn.addEventListener('click', () => editDriver(driver));
+
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.textContent = 'Elimina';
+                        deleteBtn.classList.add('btn', 'btn-danger', 'btn-sm');
+                        deleteBtn.addEventListener('click', () => deleteDriver(driver.id));
+
+                        actionsCell.appendChild(editBtn);
+                        actionsCell.appendChild(deleteBtn);
+                    });
+                }
+            } catch (error) {
+                console.error("Errore nel caricamento dei driver (catch block):", error);
+                showFlashMessage(`Errore nel caricamento dei driver: ${error.message}`, 'danger');
+            }
+        }
+
+        function editDriver(driver) {
+            console.log("Modifica driver:", driver);
+            driverIdInput.value = driver.id;
+            idCategoriaSelect.value = driver.id_categoria;
+            descrInput.value = driver.descr;
+        }
+
+        driverForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            console.log("Form driver sottomesso.");
+            const id = driverIdInput.value;
+            const idCategoria = idCategoriaSelect.value;
+            const descr = descrInput.value;
+
+            if (!idCategoria || !descr) {
+                showFlashMessage("Selezionare una Categoria e inserire una Descrizione sono obbligatori.", "warning");
+                return;
+            }
+
+            let url = DRIVER_API_URL;
+            let method = 'POST';
+            let successMessage = 'Driver creato correttamente.'; 
+            let errorMessage = 'Errore nella creazione del driver.';
+            let bodyData = { id_categoria: parseInt(idCategoria), descr: descr };
+
+            if (id) {
+                url = `${DRIVER_API_URL}${id}`;
+                method = 'PUT';
+                successMessage = 'Driver aggiornato correttamente.'; 
+                errorMessage = 'Errore nell\'aggiornamento del driver.';
+                bodyData = { id_categoria: parseInt(idCategoria), descr: descr };
+            }
+            console.log(`Invio richiesta ${method} a ${url} con dati:`, bodyData);
+
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify(bodyData)
+                });
+
+                console.log("Risposta API ricevuta per submit driver:", response);
+                const result = await response.json();
+                console.log("Risultato JSON della risposta:", result);
+
+                if (response.ok) {
+                    showFlashMessage(successMessage, 'success');
+                    driverForm.reset();
+                    driverIdInput.value = '';
+                    loadDrivers(); // Ricarica la tabella
+                } else {
+                    showFlashMessage(`${errorMessage} ${result.error || ''}`, 'danger');
+                }
+            } catch (error) {
+                console.error("Errore nella richiesta API driver (catch block):", error);
+                showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
+            }
+        });
+
+        async function deleteDriver(id) {
+            if (!confirm('Sei sicuro di voler eliminare questo driver? Questa operazione è irreversibile!')) {
+                return;
+            }
+            console.log("Tentativo di eliminare driver con ID:", id);
+
+            try {
+                const response = await fetch(`${DRIVER_API_URL}${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': csrfToken
+                    }
+                });
+
+                console.log("Risposta API ricevuta per delete driver:", response);
+                const result = await response.json();
+                console.log("Risultato JSON della risposta delete:", result);
+
+                if (response.ok) {
+                    showFlashMessage('Driver eliminato correttamente.', 'success'); 
+                    loadDrivers();
+                } else {
+                    showFlashMessage(`Errore nell\\'eliminazione del driver: ${result.error || ''}`, 'danger');
+                }
+            } catch (error) {
+                console.error("Errore nella richiesta API delete driver (catch block):", error);
+                showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
+            }
+        }
+
+        resetFormBtn.addEventListener('click', () => {
+            console.log("Resetting driver form.");
+            driverForm.reset();
+            driverIdInput.value = '';
+        });
+
+        // Event listener per il cambio di selezione della categoria
+        idCategoriaSelect.addEventListener('change', loadDrivers);
+
+        // Carica le categorie per il dropdown e poi i driver al caricamento della pagina
+        loadCategorieForDropdown();
+        loadDrivers();
+    });
+</script>
+<style>
+    /* Stile per ridurre la dimensione del font nella tabella dei driver */
+    #driversTable th,
+    #driversTable td {
+        font-size: 0.85em; /* Puoi regolare questo valore (es. 0.9em, 0.8em, small, x-small) */
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "index.html" %}
+
+{% block title %}
+Errore
+{% endblock %}
+
+{% block content %}
+<h1>Si è verificato un errore</h1>
+<p>Codice errore: {{ error_code }}</p>
+<p>Messaggio errore: {{ error_message }}</p>
+<p>Ci scusiamo per l'inconveniente. Puoi aiutarci a migliorare inviando un feedback.</p>
+
+<!-- Bottone per inviare feedback -->
+<a href="{{ url_for('appBT.contatti') }}" class="styled-button" role="button">Invia un feedback</a>
+
+<!-- Bottone per tornare alla home -->
+<a href="{{ url_for('appBT.home') }}" class="styled-button" role="button">Torna alla Home</a>
+
+{% endblock %}

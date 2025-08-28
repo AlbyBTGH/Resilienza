@@ -1,0 +1,105 @@
+# -*- coding: utf-8 -*-
+# Classi/ClasseAnagrafica/ClasseGruppoRisposta/Service_t_gruppo_risposta.py
+
+import logging
+from Classi.ClasseAnagrafica.ClasseGruppoRisposta.Repository_t_gruppo_risposta import Repository_t_gruppo_risposta
+from datetime import datetime
+
+class Service_t_gruppo_risposta:
+    """
+    Fornisce la logica di business per la gestione dei gruppi di risposta.
+    """
+    def __init__(self):
+        """
+        Inizializza il repository dei gruppi di risposta.
+        """
+        self.repository = Repository_t_gruppo_risposta()
+
+    def create_table_if_not_exists(self):
+        """
+        Crea la tabella 'gruppo_risposta' se non esiste.
+        """
+        self.repository.create_table_if_not_exists()
+
+    def get_all_gruppi_risposta(self):
+        """
+        Recupera tutti i gruppi di risposta.
+        """
+        try:
+            gruppi = self.repository.get_all()
+            logging.info(f"Recuperati {len(gruppi)} gruppi di risposta.")
+            return gruppi
+        except Exception as e:
+            logging.error(f"Errore nel servizio durante il recupero di tutti i gruppi di risposta: {str(e)}")
+            return []
+
+    def get_gruppo_risposta_by_id(self, gruppo_id: int):
+        """
+        Recupera un gruppo di risposta tramite ID.
+        """
+        try:
+            gruppo = self.repository.get_by_id(gruppo_id)
+            if gruppo:
+                logging.info(f"Recuperato gruppo di risposta con ID: {gruppo_id}")
+            else:
+                logging.warning(f"Gruppo di risposta con ID: {gruppo_id} non trovato.")
+            return gruppo
+        except Exception as e:
+            logging.error(f"Errore nel servizio durante il recupero del gruppo di risposta con ID {gruppo_id}: {str(e)}")
+            return None
+
+    def create_gruppo_risposta(self, descr: str, creato_da: str = None):
+        """
+        Crea un nuovo gruppo di risposta, verificando l'unicità della descrizione.
+        """
+        try:
+            existing_gruppo = self.repository.get_by_descr(descr)
+            if existing_gruppo:
+                logging.warning(f"Tentativo di creare gruppo di risposta con descrizione duplicata: {descr}")
+                return {"error": "Descrizione gruppo di risposta già esistente."}, 409 # Conflict
+            
+            new_gruppo = self.repository.create(descr, creato_da)
+            logging.info(f"Gruppo di risposta '{descr}' creato con successo.")
+            return new_gruppo, 201 # Created
+        except Exception as e:
+            logging.error(f"Errore nel servizio durante la creazione del gruppo di risposta '{descr}': {str(e)}")
+            return {"error": f"Errore durante la creazione del gruppo di risposta: {str(e)}"}, 500 # Internal Server Error
+
+    def update_gruppo_risposta(self, gruppo_id: int, descr: str, modificato_da: str = None):
+        """
+        Aggiorna la descrizione di un gruppo di risposta esistente.
+        """
+        try:
+            gruppo = self.repository.get_by_id(gruppo_id)
+            if not gruppo:
+                logging.warning(f"Tentativo di aggiornare gruppo di risposta con ID {gruppo_id} non trovato.")
+                return {"error": "Gruppo di risposta non trovato."}, 404 # Not Found
+            
+            # Verifica se la nuova descrizione è già utilizzata da un altro gruppo (escludendo se stesso)
+            existing_gruppo_with_descr = self.repository.get_by_descr_excluding_self(descr, gruppo_id)
+            if existing_gruppo_with_descr:
+                logging.warning(f"Tentativo di aggiornare gruppo {gruppo_id} con descrizione duplicata: {descr}")
+                return {"error": "Descrizione gruppo di risposta già esistente per un altro gruppo."}, 409 # Conflict
+
+            updated_gruppo = self.repository.update(gruppo_id, descr, modificato_da)
+            logging.info(f"Gruppo di risposta con ID {gruppo_id} aggiornato con successo.")
+            return updated_gruppo, 200 # OK
+        except Exception as e:
+            logging.error(f"Errore nel servizio durante l'aggiornamento del gruppo di risposta con ID {gruppo_id}: {str(e)}")
+            return {"error": f"Errore durante l'aggiornamento del gruppo di risposta: {str(e)}"}, 500 # Internal Server Error
+
+    def delete_gruppo_risposta(self, gruppo_id: int):
+        """
+        Elimina fisicamente un gruppo di risposta dal database.
+        """
+        try:
+            success = self.repository.delete(gruppo_id)
+            if success:
+                logging.info(f"Gruppo di risposta con ID {gruppo_id} eliminato fisicamente con successo.")
+                return {"message": "Gruppo di risposta eliminato con successo."}, 200 # OK
+            else:
+                logging.warning(f"Tentativo di eliminare gruppo di risposta con ID {gruppo_id} non trovato.")
+                return {"error": "Gruppo di risposta non trovato."}, 404 # Not Found
+        except Exception as e:
+            logging.error(f"Errore nel servizio durante l'eliminazione del gruppo di risposta con ID {gruppo_id}: {str(e)}")
+            return {"error": f"Errore durante la cancellazione del gruppo di risposta: {str(e)}"}, 500 # Internal Server Error
