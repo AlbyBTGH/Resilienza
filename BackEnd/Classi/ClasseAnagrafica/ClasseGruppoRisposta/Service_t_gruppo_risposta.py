@@ -24,66 +24,66 @@ class Service_t_gruppo_risposta:
     def get_all_gruppi_risposta(self):
         """
         Recupera tutti i gruppi di risposta.
+        La gestione degli errori è delegata al Repository (che esegue il 'raise') 
+        e al Controller (che gestisce lo status 500).
         """
-        try:
-            gruppi = self.repository.get_all()
-            logging.info(f"Recuperati {len(gruppi)} gruppi di risposta.")
-            return gruppi
-        except Exception as e:
-            logging.error(f"Errore nel servizio durante il recupero di tutti i gruppi di risposta: {str(e)}")
-            return []
+        # CORREZIONE: Rimosso il try-except che mascherava l'errore
+        gruppi = self.repository.get_all()
+        logging.info(f"Recuperati {len(gruppi)} gruppi di risposta.")
+        return gruppi
 
     def get_gruppo_risposta_by_id(self, gruppo_id: int):
         """
-        Recupera un gruppo di risposta tramite ID.
+        Recupera un gruppo di risposta per ID.
         """
         try:
             gruppo = self.repository.get_by_id(gruppo_id)
-            if gruppo:
-                logging.info(f"Recuperato gruppo di risposta con ID: {gruppo_id}")
-            else:
-                logging.warning(f"Gruppo di risposta con ID: {gruppo_id} non trovato.")
             return gruppo
         except Exception as e:
             logging.error(f"Errore nel servizio durante il recupero del gruppo di risposta con ID {gruppo_id}: {str(e)}")
-            return None
+            return None # Scelta di ritornare None in caso di errore di lettura
 
-    def create_gruppo_risposta(self, descr: str, creato_da: str = None):
+    def create_gruppo_risposta(self, descr: str, creato_da: str):
         """
-        Crea un nuovo gruppo di risposta, verificando l'unicità della descrizione.
+        Crea un nuovo gruppo di risposta.
         """
         try:
+            if not descr:
+                return {"error": "La descrizione è obbligatoria."}, 400
+
             existing_gruppo = self.repository.get_by_descr(descr)
             if existing_gruppo:
-                logging.warning(f"Tentativo di creare gruppo di risposta con descrizione duplicata: {descr}")
-                return {"error": "Descrizione gruppo di risposta già esistente."}, 409 # Conflict
-            
+                return {"error": "Un gruppo di risposta con questa descrizione esiste già."}, 409 # Conflict
+
             new_gruppo = self.repository.create(descr, creato_da)
-            logging.info(f"Gruppo di risposta '{descr}' creato con successo.")
+            logging.info(f"Nuovo gruppo di risposta creato con successo (ID: {new_gruppo['id']}).")
             return new_gruppo, 201 # Created
+
         except Exception as e:
-            logging.error(f"Errore nel servizio durante la creazione del gruppo di risposta '{descr}': {str(e)}")
+            logging.error(f"Errore nel servizio durante la creazione del gruppo di risposta: {str(e)}")
             return {"error": f"Errore durante la creazione del gruppo di risposta: {str(e)}"}, 500 # Internal Server Error
 
-    def update_gruppo_risposta(self, gruppo_id: int, descr: str, modificato_da: str = None):
+    def update_gruppo_risposta(self, gruppo_id: int, descr: str, modificato_da: str = 'system'):
         """
-        Aggiorna la descrizione di un gruppo di risposta esistente.
+        Aggiorna un gruppo di risposta esistente.
         """
         try:
-            gruppo = self.repository.get_by_id(gruppo_id)
-            if not gruppo:
-                logging.warning(f"Tentativo di aggiornare gruppo di risposta con ID {gruppo_id} non trovato.")
+            existing_gruppo = self.repository.get_by_id(gruppo_id)
+            if not existing_gruppo:
                 return {"error": "Gruppo di risposta non trovato."}, 404 # Not Found
             
-            # Verifica se la nuova descrizione è già utilizzata da un altro gruppo (escludendo se stesso)
-            existing_gruppo_with_descr = self.repository.get_by_descr_excluding_self(descr, gruppo_id)
-            if existing_gruppo_with_descr:
-                logging.warning(f"Tentativo di aggiornare gruppo {gruppo_id} con descrizione duplicata: {descr}")
-                return {"error": "Descrizione gruppo di risposta già esistente per un altro gruppo."}, 409 # Conflict
+            if not descr:
+                return {"error": "La descrizione è obbligatoria."}, 400
+
+            # Verifica unicità della descrizione
+            duplicate_gruppo = self.repository.get_by_descr_excluding_self(descr, gruppo_id)
+            if duplicate_gruppo:
+                return {"error": "Un altro gruppo di risposta con questa descrizione esiste già."}, 409 # Conflict
 
             updated_gruppo = self.repository.update(gruppo_id, descr, modificato_da)
             logging.info(f"Gruppo di risposta con ID {gruppo_id} aggiornato con successo.")
             return updated_gruppo, 200 # OK
+
         except Exception as e:
             logging.error(f"Errore nel servizio durante l'aggiornamento del gruppo di risposta con ID {gruppo_id}: {str(e)}")
             return {"error": f"Errore durante l'aggiornamento del gruppo di risposta: {str(e)}"}, 500 # Internal Server Error
@@ -103,3 +103,14 @@ class Service_t_gruppo_risposta:
         except Exception as e:
             logging.error(f"Errore nel servizio durante l'eliminazione del gruppo di risposta con ID {gruppo_id}: {str(e)}")
             return {"error": f"Errore durante la cancellazione del gruppo di risposta: {str(e)}"}, 500 # Internal Server Error
+
+    def check_gruppi_risposta_exist(self, gruppi_risposta_ids: list[int]) -> bool:
+        """
+        Controlla se tutti gli ID di gruppo di risposta forniti esistono nel database.
+        """
+        try:
+            return self.repository.check_gruppi_risposta_exist(gruppi_risposta_ids)
+        except Exception as e:
+            logging.error(f"Errore nel servizio durante la verifica dell'esistenza dei gruppi di risposta: {str(e)}")
+            # Ritorna False se c'è un errore di database.
+            return False

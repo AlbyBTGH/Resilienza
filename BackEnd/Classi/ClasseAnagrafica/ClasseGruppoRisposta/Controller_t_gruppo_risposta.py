@@ -7,14 +7,14 @@ import logging
 from datetime import datetime
 
 # Inizializzazione del Blueprint per il controller GruppoRisposta
-t_gruppo_risposta_controller = Blueprint('gruppo_risposta', __name__)
+t_gruppo_risposta_controller = Blueprint('gruppo-risposta', __name__)
 service_t_gruppo_risposta = Service_t_gruppo_risposta()
 
 # Funzione helper per formattare le date in modo sicuro
 def format_date_for_json(date_value):
     """
     Formatta un oggetto datetime o una stringa in una stringa ISO 8601.
-    Se � gi� una stringa, la restituisce cos� com'�.
+    Se è già una stringa, la restituisce così com'è.
     """
     if isinstance(date_value, datetime):
         return date_value.isoformat()
@@ -25,46 +25,43 @@ def format_date_for_json(date_value):
 @t_gruppo_risposta_controller.route("/", methods=['GET'])
 def get_all_gruppi_risposta():
     """
-    API per recuperare tutti i gruppi di risposta.
+    API per recuperare tutti i gruppi di risposta, includendo le risposte associate.
     """
     logging.info("Richiesta GET per tutti i gruppi di risposta.")
     try:
         gruppi = service_t_gruppo_risposta.get_all_gruppi_risposta()
-        logging.info(f"Recuperati {len(gruppi)} gruppi di risposta dal servizio.")
-        
-        gruppi_data = []
-        for gruppo in gruppi:
-            gruppi_data.append({
-                'id': gruppo['id'] if isinstance(gruppo, dict) else gruppo.id,
-                'descr': gruppo['descr'] if isinstance(gruppo, dict) else gruppo.descr,
-                'data_ultima_modifica': format_date_for_json(
-                    gruppo['data_ultima_modifica'] if isinstance(gruppo, dict) else gruppo.data_ultima_modifica
-                ),
-                'modificato_da': gruppo['modificato_da'] if isinstance(gruppo, dict) else gruppo.modificato_da
+        gruppi_con_risposte = []
+        for g in gruppi:
+            risposte_associate = [
+                {'id': r.id, 'descr': r.descr} for r in g.risposte
+            ]
+            gruppi_con_risposte.append({
+                'id': g.id,
+                'descr': g.descr,
+                'modificato_da': g.modificato_da,
+                'data_ultima_modifica': format_date_for_json(g.data_ultima_modifica),
+                'risposte_associate': risposte_associate
             })
         
-        return jsonify(gruppi_data), 200
+        return jsonify(gruppi_con_risposte), 200
     except Exception as e:
-        logging.error(f"Errore nel recupero dei gruppi di risposta (Controller): {e}")
-        return jsonify({"error": f"Errore interno del server nel recupero dei gruppi di risposta: {str(e)}"}), 500
+        logging.error(f"Errore nel controller durante il recupero dei gruppi di risposta: {str(e)}")
+        return jsonify({"error": "Errore interno del server"}), 500
 
 @t_gruppo_risposta_controller.route("/<int:gruppo_id>", methods=['GET'])
-def get_gruppo_risposta_by_id(gruppo_id: int):
+def get_gruppo_risposta_by_id(gruppo_id):
     """
-    API per recuperare un gruppo di risposta tramite ID.
+    API per recuperare un singolo gruppo di risposta per ID.
     """
     logging.info(f"Richiesta GET per gruppo di risposta con ID: {gruppo_id}")
     gruppo = service_t_gruppo_risposta.get_gruppo_risposta_by_id(gruppo_id)
     if gruppo:
-        gruppo_data = {
-            'id': gruppo['id'] if isinstance(gruppo, dict) else gruppo.id,
-            'descr': gruppo['descr'] if isinstance(gruppo, dict) else gruppo.descr,
-            'data_ultima_modifica': format_date_for_json(
-                gruppo['data_ultima_modifica'] if isinstance(gruppo, dict) else gruppo.data_ultima_modifica
-            ),
-            'modificato_da': gruppo['modificato_da'] if isinstance(gruppo, dict) else gruppo.modificato_da
-        }
-        return jsonify(gruppo_data), 200
+        return jsonify({
+            'id': gruppo.id,
+            'descr': gruppo.descr,
+            'modificato_da': gruppo.modificato_da,
+            'data_ultima_modifica': format_date_for_json(gruppo.data_ultima_modifica)
+        }), 200
     else:
         return jsonify({"error": "Gruppo di risposta non trovato."}), 404
 
@@ -72,20 +69,17 @@ def get_gruppo_risposta_by_id(gruppo_id: int):
 def create_gruppo_risposta():
     """
     API per creare un nuovo gruppo di risposta.
-    Richiede 'descr' nel corpo della richiesta JSON.
-    Recupera 'creato_da' dalla sessione dell'utente loggato.
     """
     data = request.get_json()
     descr = data.get('descr')
+    modificato_da = session.get('username', 'Sistema')
     
-    creato_da = session.get('username', 'Sistema')
-
     if not descr:
-        logging.warning("Tentativo di creare gruppo di risposta con descrizione mancante.")
-        return jsonify({"error": "Descrizione � obbligatoria."}), 400
+        logging.warning("Tentativo di creare un gruppo di risposta senza descrizione.")
+        return jsonify({"error": "La descrizione è obbligatoria."}), 400
 
-    logging.info(f"Richiesta POST per creare gruppo di risposta con descrizione: {descr}")
-    result_obj, status_code = service_t_gruppo_risposta.create_gruppo_risposta(descr, creato_da)
+    logging.info("Richiesta POST per creare un nuovo gruppo di risposta.")
+    result_obj, status_code = service_t_gruppo_risposta.create_gruppo_risposta(descr, modificato_da)
     
     if status_code == 201 and result_obj:
         return jsonify({
@@ -100,20 +94,17 @@ def create_gruppo_risposta():
         return jsonify(result_obj), status_code
 
 @t_gruppo_risposta_controller.route("/<int:gruppo_id>", methods=['PUT'])
-def update_gruppo_risposta(gruppo_id: int):
+def update_gruppo_risposta(gruppo_id):
     """
-    API per aggiornare la descrizione di un gruppo di risposta esistente.
-    Richiede 'descr' nel corpo della richiesta JSON.
-    Recupera 'modificato_da' dalla sessione dell'utente loggato.
+    API per aggiornare un gruppo di risposta esistente.
     """
     data = request.get_json()
     descr = data.get('descr')
-
     modificato_da = session.get('username', 'Sistema')
 
     if not descr:
         logging.warning(f"Tentativo di aggiornare gruppo di risposta {gruppo_id} con descrizione mancante.")
-        return jsonify({"error": "Descrizione � obbligatoria."}), 400
+        return jsonify({"error": "Descrizione è obbligatoria."}), 400
 
     logging.info(f"Richiesta PUT per aggiornare gruppo di risposta con ID: {gruppo_id}")
     result_obj, status_code = service_t_gruppo_risposta.update_gruppo_risposta(gruppo_id, descr, modificato_da)
@@ -131,11 +122,10 @@ def update_gruppo_risposta(gruppo_id: int):
         return jsonify(result_obj), status_code
 
 @t_gruppo_risposta_controller.route("/<int:gruppo_id>", methods=['DELETE'])
-def delete_gruppo_risposta(gruppo_id: int):
+def delete_gruppo_risposta(gruppo_id):
     """
-    API per eliminare fisicamente un gruppo di risposta.
+    API per eliminare un gruppo di risposta per ID.
     """
     logging.info(f"Richiesta DELETE per gruppo di risposta con ID: {gruppo_id}")
     result, status_code = service_t_gruppo_risposta.delete_gruppo_risposta(gruppo_id)
     return jsonify(result), status_code
-

@@ -55,6 +55,11 @@ from Classi.ClasseAnagrafica.ClasseGruppoRisposta.Domain_t_gruppo_risposta impor
 # Import del Domain per Caricamento Dati # AGGIUNTO
 from Classi.Classe_dati_caricamento.Domain_t_dati_caricamento import TDatiCaricamento
 
+# Importa il nuovo controller per la gestione dei progetti
+from Classi.ClasseAnagrafica.ClasseProgetto.Controller_t_progetto import t_progetto_controller
+# Importa il modello per la tabella PROGETTO
+from Classi.ClasseAnagrafica.ClasseProgetto.Domain_t_progetto import TProgetto
+
 # Servizi e Repository
 from Classi.Classe_menu_principale.Service_t_menu_principale import Service_t_menu_principale
 from Classi.ClasseUtenti.Classe_t_funzionalita.Service_t_funzionalita import Service_t_funzionalita
@@ -85,6 +90,21 @@ from Classi.ClasseAnagrafica.ClasseGruppoRisposta.Controller_t_gruppo_risposta i
 # Import del Service per Caricamento Dati # AGGIUNTO
 from Classi.Classe_dati_caricamento.Service_t_dati_caricamento import ServiceTDatiCaricamento
 
+# AGGIUNTA: Istanzia il servizio per la gestione dei progetti
+from Classi.ClasseAnagrafica.ClasseProgetto.Service_t_progetto import Service_t_progetto
+
+from Classi.ClasseAnagrafica.ClasseAmbito.Controller_t_ambito import t_ambito_controller
+
+from Classi.ClasseAnagrafica.ClasseStatoProgetto.Controller_stati_progetto import t_stato_progetto_controller
+
+from Classi.ClasseQuestionario.Controller_t_questionario import t_questionario_controller
+
+from Classi.ClasseQuestionario.Domain_t_questionario import TQuestionario
+
+from sqlalchemy.orm import joinedload
+
+from Classi.ClasseAnagrafica.ClasseRisposta.Controller_t_risposta import t_risposta_controller
+from Classi.ClasseAnagrafica.ClasseRisposta.Service_t_risposta import Service_t_risposta
 
 # Inizializzazione del logging
 logging.basicConfig(level=logging.INFO)
@@ -110,6 +130,11 @@ service_t_gruppo_risposta = Service_t_gruppo_risposta()
 
 service_t_dati_caricamento = ServiceTDatiCaricamento() # AGGIUNTO
 
+# AGGIUNTA: Istanzia il servizio per la gestione dei progetti
+service_t_progetto = Service_t_progetto()
+
+service_t_risposta = Service_t_risposta()
+service_t_risposta.create_table_if_not_exists()
 
 # Definisci la classe del form di login
 class LoginFormNoCSRF(FlaskForm):
@@ -452,72 +477,325 @@ def caricamento_domande_page():
         current_user_role_descr=current_user_role_descr,
         csrf_token=csrf_token
     )
-""""
-# Funzione per il caricamento dei dati
-def upload_domande():
+
+@appBT.route('/caricamenti_log')
+@login_required
+def visualizza_caricamenti():
+    """
+    Pagina per visualizzare i log dei caricamenti massivi.
+    """
     try:
-        if 'file' not in request.files:
-            return jsonify({"error": "Nessun file selezionato"}), 400
+        caricamenti = service_t_dati_caricamento.get_all_caricamenti()
+        return render_template('visualizza_caricamenti.html', caricamenti=caricamenti)
+    except Exception as e:
+        print(f"ERRORE: Impossibile recuperare i dati dei caricamenti: {e}")
+        flash("Errore nel recupero dei dati dei caricamenti.", "danger")
+        return redirect(url_for('caricamento_domande'))
+    
+# ### route PROGETTI ###
+@appBT.route("/progetti")
+@login_required
+def progetti_page():
+    current_user_role_id = session.get('user_role_id')
+    current_user_email = session.get('user_email')
+    current_username = session.get('username')
+    current_user_role_descr = session.get('user_role_descr')
 
-        file = request.files['file']
+    dynamic_menu = []
+    if current_user_role_id is not None:
+        dynamic_menu = service_t_funzionalita_utente.build_menu_structure(role_id=current_user_role_id)
+    else:
+        print("DEBUG: Ruolo utente non definito in sessione per progetti_page. Menu vuoto.")
 
-        if file.filename == '':
-            return jsonify({"error": "Nessun file selezionato"}), 400
+    from flask_wtf.csrf import generate_csrf
+    csrf_token = generate_csrf()
 
-        # Debug: Stampa il nome del file e il tipo MIME
-        print(f"DEBUG: File ricevuto: {file.filename}, Tipo: {file.mimetype}")
+    return render_template(
+        "progetti.html",
+        title="Gestione Progetti",
+        menu_data=dynamic_menu,
+        current_user_email=current_user_email,
+        current_username=current_username,
+        current_user_role_descr=current_user_role_descr,
+        csrf_token=csrf_token
+    )
 
-        if file.filename.endswith('.xlsx'):
-            df = pd.read_excel(io.BytesIO(file.read()))
+"""
+@appBT.route("/crea_questionario", methods=['GET'])
+@login_required
+def crea_questionario():
+    # Il decoratore @login_required gestisce già l'autenticazione.
+    
+    # Crea un'istanza del servizio per poter chiamare il metodo corretto.
+    menu_service = Service_t_menu_principale()
+    menu = menu_service.get_menu_principale()
+
+    print(f"DEBUG: Contenuto del menu recuperato: {menu}")
+    
+    return render_template("crea_questionario.html", menu=menu, **{'csrf_token': session.get('csrf_token')})
+"""
+
+# ### route CREA QUESTIONARIO ###
+@appBT.route("/crea_questionario", methods=['GET'])
+@login_required
+def crea_questionario():
+    current_user_role_id = session.get('user_role_id')
+    current_user_email = session.get('user_email')
+    current_username = session.get('username')
+    current_user_role_descr = session.get('user_role_descr')
+
+    dynamic_menu = []
+    if current_user_role_id is not None:
+        dynamic_menu = service_t_funzionalita_utente.build_menu_structure(role_id=current_user_role_id)
+    else:
+        print("DEBUG: Ruolo utente non definito in sessione per crea_questionario. Menu vuoto.")
+
+    from flask_wtf.csrf import generate_csrf
+    csrf_token = generate_csrf()
+
+    return render_template(
+        "crea_questionario.html",
+        title="Crea Questionario",
+        menu_data=dynamic_menu,  # Questa è la riga fondamentale da modificare
+        current_user_email=current_user_email,
+        current_username=current_username,
+        current_user_role_descr=current_user_role_descr,
+        csrf_token=csrf_token
+    )
+
+
+
+
+
+# ### route GESTIONE QUESTIONARIO ###
+@appBT.route('/gestione_questionario/<int:questionario_id>', methods=['GET'])
+@login_required
+def gestione_questionario(questionario_id):
+    db_session = SessionLocal()
+    questionario_descr = f"Questionario ID: {questionario_id}"
+
+    try:
+        # Recupera il questionario per ottenere la sua descrizione
+        questionario = db_session.query(TQuestionario).filter(TQuestionario.id == questionario_id).one_or_none()
+
+        if not questionario:
+            flash("Questionario non trovato.", "danger")
+            return redirect(url_for('appBT.dashboard_route'))
         else:
-            return jsonify({"error": "Formato file non supportato. Usa .xlsx"}), 400
-
-        # Rimuovi spazi extra dai nomi delle colonne e convertili in minuscolo
-        df.columns = df.columns.str.strip().str.lower()
+            questionario_descr = questionario.descr
         
-        # Debug: Stampa le colonne lette e i loro tipi di dato
-        print(f"DEBUG: Colonne lette dal file: {df.columns.tolist()}")
-        print(f"DEBUG: Tipi di dato delle colonne:\n{df.dtypes}")
+    except Exception as e:
+        print(f"ERRORE: Errore nel recupero del questionario per il titolo: {e}")
+    finally:
+        db_session.close()
 
-        if 'id_driver' not in df.columns or 'descrizione' not in df.columns:
-            return jsonify({"error": "Il file Excel deve contenere le colonne 'id_driver' e 'descrizione'"}), 400
+    current_user_role_id = session.get('user_role_id')
+    current_user_email = session.get('user_email')
+    current_username = session.get('username')
+    current_user_role_descr = session.get('user_role_descr')
 
-        session_db = SessionLocal()
+    dynamic_menu = []
+    if current_user_role_id is not None:
+        dynamic_menu = service_t_funzionalita_utente.build_menu_structure(role_id=current_user_role_id)
+    else:
+        print("DEBUG: Ruolo utente non definito in sessione per gestione_questionario. Menu vuoto.")
+
+    from flask_wtf.csrf import generate_csrf
+    csrf_token = generate_csrf()
+
+    return render_template(
+        'gestione_questionario.html',
+        title="Modifica Questionario",
+        menu_data=dynamic_menu,
+        current_user_email=current_user_email,
+        current_username=current_username,
+        current_user_role_descr=current_user_role_descr,
+        csrf_token=csrf_token,
+        questionario_id=questionario_id,
+        questionario_descr=questionario_descr
+    )
+
+# ### API GESTIONE QUESTIONARIO ###
+@appBT.route('/api/questionario/<int:questionario_id>', methods=['GET'])
+@login_required
+def get_questionario_by_id(questionario_id):
+    db_session = SessionLocal()
+    try:
+        # Carica il questionario e le sue domande in un'unica query
+        # Utilizza l'alias corretto per la relazione
+        questionario = db_session.query(TQuestionario).options(
+            joinedload(TQuestionario.domande)
+        ).filter(TQuestionario.id == questionario_id).one_or_none()
+
+        if not questionario:
+            return jsonify({'error': 'Questionario non trovato'}), 404
+
+        # Aggiungi un log per verificare se le domande sono state caricate
+        print(f"DEBUG: Trovate {len(questionario.domande)} domande per il questionario {questionario_id}")
+
+        # Serializzazione dei dati del questionario, inclusa la lista di domande
+        domande_selezionate = [
+            {'id': d.id, 'descr': d.descr} for d in questionario.domande
+        ]
         
-        # Debug: Stampa il numero di righe da inserire
-        print(f"DEBUG: Trovate {len(df)} righe valide per l'inserimento.")
+        questionario_data = {
+            'id': questionario.id,
+            'descr': questionario.descr,
+            'domande': domande_selezionate,
+        }
 
-        try:
-            for index, row in df.iterrows():
-                # Assicurati che il tipo di dato sia corretto
-                id_driver = int(row['id_driver'])
-                descrizione = str(row['descrizione'])
-
-                nuova_domanda = TDatiCaricamento(
-                    ID_DRIVER=id_driver,
-                    DESCR=descrizione,
-                    MODIFICATO_DA=session.get('username')
-                )
-                session_db.add(nuova_domanda)
-            
-            session_db.commit()
-            print("DEBUG: Commit del database completato con successo.")
-
-            return jsonify({"message": f"Caricamento completato. Inseriti {len(df)} record."}), 200
-
-        except Exception as db_error:
-            session_db.rollback()
-            # Debug: Stampa l'errore specifico del database
-            print(f"ERRORE DB: Errore durante l'inserimento dei dati nel database: {db_error}")
-            return jsonify({"error": f"Errore durante l'inserimento dei dati nel database. Dettagli: {str(db_error)}"}), 500
-        finally:
-            session_db.close()
+        return jsonify(questionario_data), 200
 
     except Exception as e:
-        # Debug: Stampa l'errore generico
-        print(f"ERRORE GENERICO: Si è verificata un'eccezione non gestita: {e}")
-        return jsonify({"error": "Errore di rete o del server. Controlla il terminale per maggiori dettagli."}), 500
-"""
+        print(f"ERRORE: Errore nel recupero del questionario: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db_session.close()
+
+# ### API GESTIONE DOMANDE PER FRONTEND ###
+@appBT.route('/api/domande/', methods=['GET'])
+@login_required
+def get_all_domande():
+    """API per recuperare tutte le domande e il loro driver per il frontend."""
+    session = SessionLocal()
+    try:
+        domande = session.query(TDomanda).options(joinedload(TDomanda.driver_rel)).all()
+        
+        domande_list = [
+            {
+                'id': domanda.id,
+                'descr': domanda.descr,
+                'id_driver': domanda.id_driver,
+                'driver_descr': domanda.driver_rel.descr if domanda.driver_rel else 'N/A'
+            }
+            for domanda in domande
+        ]
+        return jsonify(domande_list), 200
+    except Exception as e:
+        print(f"ERRORE: Errore nel recupero delle domande: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+# ### API PER IL RECUPERO COMPLETO DELLE DOMANDE (per gestione_questionario) ###
+@appBT.route('/api/domande_complete/', methods=['GET'])
+@login_required
+def get_domande_complete():
+    """API per recuperare tutte le domande, incluse le informazioni complete sul driver, per il frontend."""
+    session = SessionLocal()
+    try:
+        domande = session.query(TDomanda).options(joinedload(TDomanda.driver_rel)).all()
+        
+        domande_list = [
+            {
+                'id': domanda.id,
+                'descr': domanda.descr,
+                'id_driver': domanda.id_driver,
+                'driver_rel': {'id': domanda.driver_rel.id, 'descr': domanda.driver_rel.descr} if domanda.driver_rel else None
+            }
+            for domanda in domande
+        ]
+        return jsonify(domande_list), 200
+    except Exception as e:
+        print(f"ERRORE: Errore nel recupero delle domande: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+        
+# ### API UPDATE QUESTIONARIO ###
+@appBT.route('/api/questionari/<int:questionario_id>', methods=['PUT'])
+@login_required
+def update_questionario(questionario_id):
+    """API per aggiornare un questionario esistente."""
+    session = SessionLocal()
+    try:
+        data = request.json
+        if not data:
+            return jsonify({'error': 'Dati JSON mancanti'}), 400
+
+        descr = data.get('descr')
+        domande_ids = data.get('domande')
+
+        if not descr or not domande_ids:
+            return jsonify({'error': 'Descrizione o domande mancanti'}), 400
+        
+        questionario = session.query(TQuestionario).filter(TQuestionario.id == questionario_id).one_or_none()
+        if not questionario:
+            return jsonify({'error': 'Questionario non trovato'}), 404
+        
+        questionario.descr = descr
+        
+        # Aggiorna le domande associate
+        domande_attuali = {d.id: d for d in questionario.domande}
+        nuove_domande = session.query(TDomanda).filter(TDomanda.id.in_(domande_ids)).all()
+        
+        # Rimuovi le domande non più selezionate
+        for domanda_id in list(domande_attuali.keys()):
+            if domanda_id not in domande_ids:
+                questionario.domande.remove(domande_attuali[domanda_id])
+        
+        # Aggiungi le nuove domande selezionate
+        for domanda in nuove_domande:
+            if domanda.id not in domande_attuali:
+                questionario.domande.append(domanda)
+        
+        session.commit()
+        return jsonify({'message': 'Questionario aggiornato con successo', 'id': questionario.id}), 200
+
+    except Exception as e:
+        session.rollback()
+        print(f"ERRORE: Errore nell'aggiornamento del questionario: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@appBT.route('/api/drivers/', methods=['GET'])
+@login_required
+def get_drivers():
+    db_session = SessionLocal()
+    try:
+        drivers = db_session.query(TDriver).all()
+        drivers_list = [{'id': d.id, 'descr': d.descr} for d in drivers]
+        return jsonify(drivers_list), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db_session.close()
+
+
+@appBT.route("/gestione_risposte")
+@login_required
+def gestione_risposte():
+    """
+    Renderizza la pagina di gestione dell'anagrafica Risposta.
+    Passa i dati necessari per il menu dinamico e il token CSRF.
+    """
+    # Replica la logica della rotta '/domanda' per visualizzare il menu
+    current_user_role_id = session.get('user_role_id')
+    current_user_email = session.get('user_email')
+    current_username = session.get('username')
+    current_user_role_descr = session.get('user_role_descr')
+
+    dynamic_menu = []
+    if current_user_role_id is not None:
+        dynamic_menu = service_t_funzionalita_utente.build_menu_structure(role_id=current_user_role_id)
+    else:
+        print("DEBUG: Ruolo utente non definito in sessione per gestione_risposte. Menu vuoto.")
+
+    from flask_wtf.csrf import generate_csrf
+    csrf_token = generate_csrf() # Qui generi il token
+
+    return render_template(
+        "risposta.html",
+        title="Gestione Risposte",
+        menu_data=dynamic_menu,
+        current_user_email=current_user_email,
+        current_username=current_username,
+        current_user_role_descr=current_user_role_descr,
+        csrf_token=csrf_token # E qui lo passi come variabile
+    )
+
 
 def upload_domande():
     try:
@@ -549,7 +827,6 @@ def upload_domande():
 
         try:
             for index, row in df.iterrows():
-                # LA CORREZIONE È QUI: Usare i nomi dei parametri in minuscolo
                 nuova_domanda = TDomanda(
                     id_driver=int(row['id_driver']),  
                     descr=str(row['descrizione']),
@@ -559,6 +836,19 @@ def upload_domande():
             
             session_db.commit()
             print("DEBUG: Commit del database completato con successo.")
+
+            # Chiamata al servizio di log del caricamento riuscito
+            try:
+                service_t_dati_caricamento.log_caricamento(
+                    descrizione="Caricamento massivo domande",
+                    utente=session.get('username'),
+                    numero_record=len(df),
+                    stato="successo"
+                )
+                print("DEBUG: Log di caricamento salvato in t_dati_caricamento.")
+            except Exception as log_error:
+                # Logga l'errore ma non bloccare la risposta HTTP di successo
+                print(f"ERRORE DI LOG: Impossibile salvare il log di caricamento: {log_error}")
 
             return jsonify({"message": f"Caricamento completato. Inseriti {len(df)} record."}), 200
 
@@ -573,6 +863,7 @@ def upload_domande():
         print(f"ERRORE GENERICO: Si è verificata un'eccezione non gestita: {e}")
         return jsonify({"error": "Errore di rete o del server. Controlla il terminale per maggiori dettagli."}), 500
     
+            
 # --- AVVIO DELL'APPLICAZIONE FLASK ---
 if __name__ == '__main__':
     app = Flask(__name__, template_folder='template')
@@ -597,9 +888,19 @@ if __name__ == '__main__':
     # ### INIZIO AGGIUNTA PER GRUPPO_RISPOSTA ###
     print("DEBUG: Registrando t_gruppo_risposta_controller con prefisso /api/gruppo_risposta")
     from Classi.ClasseAnagrafica.ClasseGruppoRisposta.Controller_t_gruppo_risposta import t_gruppo_risposta_controller
-    app.register_blueprint(t_gruppo_risposta_controller, url_prefix='/api/gruppo_risposta')
+    app.register_blueprint(t_gruppo_risposta_controller, url_prefix='/api/gruppo-risposta')
     # ### FINE AGGIUNTA PER GRUPPO_RISPOSTA ###
 
+    # Registra il blueprint per la gestione dei progetti
+    app.register_blueprint(t_progetto_controller, url_prefix='/api/progetto')
+
+    # Registra il blueprint per la gestione degli stati progetto
+    app.register_blueprint(t_stato_progetto_controller, url_prefix='/api/stati_progetto')
+
+    app.register_blueprint(t_questionario_controller, url_prefix='/api/questionario')
+
+    app.register_blueprint(t_risposta_controller, url_prefix='/api/risposta')
+    
     print("DEBUG: Registrando la rotta di upload 'upload_domande' con prefisso /api/domande/upload")
     app.add_url_rule('/api/domande/upload', 'upload_domande', upload_domande, methods=['POST'])
 
@@ -622,6 +923,8 @@ if __name__ == '__main__':
         service_t_gruppo_risposta.create_table_if_not_exists()
         print("INFO: Tabella 'gruppo_risposta' creata o già esistente.")
         # ### FINE AGGIUNTA PER GRUPPO_RISPOSTA ###
+        # AGGIUNTA: Assicurati che TProgetto sia importato e le tabelle create
+        TProgetto.__table__.create(bind=engine, checkfirst=True)
         # Assicurati che la tabella 't_dati_caricamento' sia creata
         # AGGIUNTO
         session_pop_caricamento = SessionLocal()

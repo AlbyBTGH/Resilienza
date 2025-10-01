@@ -4,6 +4,7 @@
 import logging
 from Classi.ClasseAnagrafica.ClasseDomanda.Repository_t_domanda import Repository_t_domanda
 from Classi.ClasseAnagrafica.ClasseDriver.Repository_t_driver import Repository_t_driver # Per verificare l'esistenza del driver
+from Classi.ClasseAnagrafica.ClasseGruppoRisposta.Repository_t_gruppo_risposta import Repository_t_gruppo_risposta 
 from datetime import datetime
 
 class Service_t_domanda:
@@ -16,6 +17,7 @@ class Service_t_domanda:
         """
         self.repository = Repository_t_domanda()
         self.driver_repository = Repository_t_driver() # Per la verifica del driver
+        self.gruppo_risposta_repository = Repository_t_gruppo_risposta() 
 
     def create_table_if_not_exists(self):
         """
@@ -50,7 +52,7 @@ class Service_t_domanda:
             logging.error(f"Errore nel servizio durante il recupero della domanda con ID {domanda_id}: {str(e)}")
             return None
 
-    def create_domanda(self, descr: str, id_driver: int, creato_da: str = 'system'):
+    def create_domanda(self, descr: str, id_driver: int, id_gruppo_risposta: int = None, creato_da: str = 'system'):
         """
         Crea una nuova domanda nel database.
         Valida l'esistenza del driver associato.
@@ -64,8 +66,15 @@ class Service_t_domanda:
             if not driver_exists:
                 logging.warning(f"Tentativo di creare domanda con ID driver {id_driver} non esistente.")
                 return {"error": "Driver specificato non esistente."}, 400
+            
+            # NUOVA LOGICA: Verifica che il Gruppo Risposta esista (se specificato e non nullo)
+            if id_gruppo_risposta is not None and id_gruppo_risposta != 0:
+                gruppo_risposta_exists = self.gruppo_risposta_repository.get_by_id(id_gruppo_risposta)
+                if not gruppo_risposta_exists:
+                    return {"error": "Gruppo Risposta specificato non esistente."}, 400
 
-            new_domanda = self.repository.create(descr, id_driver, creato_da)
+        
+            new_domanda = self.repository.create(descr, id_driver, creato_da, id_gruppo_risposta) 
             logging.info(f"Nuova domanda creata con successo (ID: {new_domanda['id']}).")
             return new_domanda, 201
 
@@ -73,7 +82,7 @@ class Service_t_domanda:
             logging.error(f"Errore nel servizio durante la creazione della domanda: {str(e)}")
             return {"error": f"Errore durante la creazione della domanda: {str(e)}"}, 500
 
-    def update_domanda(self, domanda_id: int, descr: str, id_driver: int, modificato_da: str = 'system'):
+    def update_domanda(self, domanda_id: int, descr: str, id_driver: int, id_gruppo_risposta: int = None, modificato_da: str = 'system'):
         """
         Aggiorna una domanda esistente nel database.
         Valida l'esistenza della domanda e del driver associato.
@@ -93,8 +102,16 @@ class Service_t_domanda:
             if not driver_exists:
                 logging.warning(f"Tentativo di aggiornare domanda con ID driver {id_driver} non esistente.")
                 return {"error": "Driver specificato non esistente."}, 400
+            
+            # NUOVA LOGICA: Verifica che il Gruppo Risposta esista (se specificato e non nullo)
+            if id_gruppo_risposta is not None and id_gruppo_risposta != 0:
+                gruppo_risposta_exists = self.gruppo_risposta_repository.get_by_id(id_gruppo_risposta)
+                if not gruppo_risposta_exists:
+                    return {"error": "Gruppo Risposta specificato non esistente."}, 400
 
-            updated_domanda = self.repository.update(domanda_id, descr, id_driver, modificato_da)
+        
+            # Passa il nuovo campo al repository
+            updated_domanda = self.repository.update(domanda_id, descr, id_driver, id_gruppo_risposta, modificato_da) 
             logging.info(f"Domanda con ID {domanda_id} aggiornata con successo.")
             return updated_domanda, 200
 

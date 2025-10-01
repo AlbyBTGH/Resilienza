@@ -1,0 +1,320 @@
+{% extends "index.html" %}
+
+{% block title %}Gestione Progetti{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="messages mb-3"></div>
+
+    <div class="d-flex justify-content-end align-items-center mb-4">
+        <a href="{{ url_for('appBT.index') }}" class="btn btn-info btn-sm">
+            <i class="fas fa-arrow-left me-1"></i> Torna alla Home
+        </a>
+    </div>
+
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Aggiungi / Modifica Progetto</h5>
+        </div>
+        <div class="card-body">
+            <form id="progettoForm">
+                <input type="hidden" id="progettoId">
+                <input type="hidden" id="csrf_token" name="csrf_token" value="{{ csrf_token }}">
+                <div class="mb-3">
+                    <label for="descr" class="form-label">Descrizione Progetto</label>
+                    <input type="text" class="form-control" id="descr" required>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="dt_inizio" class="form-label">Data Inizio</label>
+                        <input type="date" class="form-control" id="dt_inizio">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="dt_fine" class="form-label">Data Fine</label>
+                        <input type="date" class="form-control" id="dt_fine">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="id_stato" class="form-label">Stato Progetto</label>
+                        <select class="form-select" id="id_stato" required>
+                             </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="id_ambito" class="form-label">Ambito</label>
+                        <select class="form-select" id="id_ambito" required></select>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="ref_cliente" class="form-label">Riferimento Cliente</label>
+                    <input type="text" class="form-control" id="ref_cliente">
+                </div>
+                <div class="mb-3">
+                    <label for="modificato_da" class="form-label">Modificato Da</label>
+                    <input type="text" class="form-control" id="modificato_da">
+                </div>
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                    <button type="submit" class="btn btn-success me-md-2">Salva Progetto</button>
+                    <button type="button" class="btn btn-secondary" id="resetFormBtn">Cancella</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0">Elenco Progetti</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped" id="progettiTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Descrizione</th>
+                            <th>Data Inizio</th>
+                            <th>Data Fine</th>
+                            <th>Stato</th>
+                            <th>Ambito</th>
+                            <th>Cliente</th>
+                            <th>Modificato Da</th>
+                            <th>Ultima Modifica</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+        const API_URL = 'http://127.0.0.1:5000/api/progetto/';
+        const AMBITI_API_URL = 'http://127.0.0.1:5000/api/ambito/';
+
+        const csrfToken = document.getElementById('csrf_token').value;
+        const progettoForm = document.getElementById('progettoForm');
+        const progettoIdInput = document.getElementById('progettoId');
+        const descrInput = document.getElementById('descr');
+        const dtInizioInput = document.getElementById('dt_inizio');
+        const dtFineInput = document.getElementById('dt_fine');
+        const idStatoInput = document.getElementById('id_stato');
+        const idAmbitoSelect = document.getElementById('id_ambito');
+        const refClienteInput = document.getElementById('ref_cliente');
+        const modificatoDaInput = document.getElementById('modificato_da');
+        const progettiTableBody = document.querySelector('#progettiTable tbody');
+        const resetFormBtn = document.getElementById('resetFormBtn');
+
+        function showFlashMessage(message, category) {
+            const messagesContainer = document.querySelector('.messages');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${category} alert-dismissible fade show`;
+            alertDiv.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>`;
+            messagesContainer.appendChild(alertDiv);
+            setTimeout(() => {
+                alertDiv.classList.remove('show');
+                alertDiv.classList.add('fade');
+                alertDiv.remove();
+            }, 5000);
+        }
+
+        async function loadAmbiti() {
+            try {
+                const response = await fetch(AMBITI_API_URL);
+                const ambiti = await response.json();
+                idAmbitoSelect.innerHTML = ''; // Pulisci le opzioni esistenti
+                ambiti.forEach(ambito => {
+                    const option = document.createElement('option');
+                    option.value = ambito.id;
+                    option.textContent = ambito.descrizione;
+                    idAmbitoSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error("Errore nel caricamento degli ambiti:", error);
+                showFlashMessage("Errore nel caricamento degli ambiti.", 'danger');
+            }
+        }
+
+        // Funzione per formattare la data da yyyy-mm-dd a dd/mm/yyyy
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const [year, month, day] = dateString.split('-');
+            return `${day}/${month}/${year}`;
+        }
+
+        async function loadProgetti() {
+            try {
+                const response = await fetch(API_URL);
+                const progetti = await response.json();
+                progettiTableBody.innerHTML = '';
+                progetti.forEach(progetto => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${progetto.id}</td>
+                        <td>${progetto.descr}</td>
+                        <td>${formatDate(progetto.dt_inizio)}</td>
+                        <td>${formatDate(progetto.dt_fine)}</td>
+                        <td>${progetto.stato_descr || ''}</td>
+                        <td>${progetto.ambito_descr}</td>
+                        <td>${progetto.ref_cliente || ''}</td>
+                        <td>${progetto.modificato_da || ''}</td>
+                        <td>${formatDate(progetto.data_ultima_modifica.split('T')[0])}</td>
+                        <td>
+                            <button class="btn btn-warning btn-sm edit-btn" data-id="${progetto.id}">Modifica</button>
+                            <button class="btn btn-danger btn-sm delete-btn" data-id="${progetto.id}">Elimina</button>
+                        </td>
+                    `;
+                    progettiTableBody.appendChild(row);
+                });
+
+                document.querySelectorAll('.edit-btn').forEach(button => {
+                    button.addEventListener('click', async (e) => {
+                        const id = e.target.dataset.id;
+                        await editProgetto(id);
+                    });
+                });
+
+                document.querySelectorAll('.delete-btn').forEach(button => {
+                    button.addEventListener('click', async (e) => {
+                        const id = e.target.dataset.id;
+                        await deleteProgetto(id);
+                    });
+                });
+            } catch (error) {
+                console.error("Errore nel caricamento dei progetti:", error);
+                showFlashMessage("Errore nel caricamento dei progetti.", 'danger');
+            }
+        }
+
+        async function editProgetto(id) {
+            try {
+                const response = await fetch(`${API_URL}${id}`);
+                const progetto = await response.json();
+                progettoIdInput.value = progetto.id;
+                descrInput.value = progetto.descr;
+                dtInizioInput.value = progetto.dt_inizio;
+                dtFineInput.value = progetto.dt_fine;
+                idStatoInput.value = progetto.id_stato;
+                idAmbitoSelect.value = progetto.id_ambito;
+                refClienteInput.value = progetto.ref_cliente;
+                modificatoDaInput.value = progetto.modificato_da;
+
+                // Scrolla in cima per vedere il form
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } catch (error) {
+                console.error("Errore nel caricamento del progetto per la modifica:", error);
+                showFlashMessage("Errore nel caricamento del progetto per la modifica.", 'danger');
+            }
+        }
+
+        progettoForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = progettoIdInput.value;
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `${API_URL}${id}` : API_URL;
+
+            const data = {
+                descr: descrInput.value,
+                dt_inizio: dtInizioInput.value,
+                dt_fine: dtFineInput.value,
+                id_stato: idStatoInput.value ? parseInt(idStatoInput.value) : null,
+                id_ambito: idAmbitoSelect.value ? parseInt(idAmbitoSelect.value) : null,
+                ref_cliente: refClienteInput.value,
+                modificato_da: modificatoDaInput.value,
+            };
+
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    showFlashMessage('Operazione effettuata correttamente', 'success');
+                    progettoForm.reset();
+                    progettoIdInput.value = '';
+                    loadProgetti();
+                } else {
+                    showFlashMessage(`Errore: ${result.error || response.statusText}`, 'danger');
+                }
+            } catch (error) {
+                console.error("Errore nella richiesta API:", error);
+                showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
+            }
+        });
+
+        async function deleteProgetto(id) {
+            if (!confirm('Sei sicuro di voler eliminare questo progetto? Operazione irreversibile!')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': csrfToken
+                    }
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    showFlashMessage('Operazione effettuata correttamente', 'success');
+                    loadProgetti();
+                } else {
+                    showFlashMessage(`Errore eliminazione del progetto: ${result.error || ''}`, 'danger');
+                }
+            } catch (error) {
+                console.error("Errore nella richiesta API delete:", error);
+                showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
+            }
+        }
+
+        async function loadStatiProgetto() {
+            const statoProgettoSelect = document.getElementById('id_stato');
+            // Pulisci le opzioni esistenti, se presenti
+            statoProgettoSelect.innerHTML = '';
+    
+            // Aggiungi l'opzione di default
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = 'Seleziona uno stato';
+            statoProgettoSelect.appendChild(defaultOption);
+
+            try {
+                const response = await fetch('/api/stati_progetto/');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const stati = await response.json();
+                stati.forEach(stato => {
+                    const option = document.createElement('option');
+                    option.value = stato.id;
+                    option.textContent = stato.descr;
+                    statoProgettoSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error("Errore nel caricamento degli stati progetto:", error);
+            }
+        }
+
+        resetFormBtn.addEventListener('click', () => {
+            progettoForm.reset();
+            progettoIdInput.value = '';
+        });
+
+        // Carica la lista degli ambiti e dei progetti all avvio della pagina
+        loadAmbiti();
+        loadStatiProgetto();
+        loadProgetti();
+    });
+</script>
+{% endblock %}

@@ -57,6 +57,7 @@
                         <tr>
                             <th>ID</th>
                             <th>Descrizione</th>
+                            <th>Risposte Associate</th>
                             <th>Ultima Modifica</th>
                             <th>Modificato Da</th>
                             <th>Azioni</th>
@@ -87,7 +88,7 @@
         console.log("CSRF Token recuperato:", csrfToken ? "presente" : "assente");
 
         const API_BASE_URL = window.location.origin;
-        const GRUPPO_RISPOSTA_API_URL = `${API_BASE_URL}/api/gruppo_risposta/`;
+        const GRUPPO_RISPOSTA_API_URL = `${API_BASE_URL}/api/gruppo-risposta/`;
 
         // Funzione per mostrare i messaggi flash
         function showFlashMessage(message, category = 'info') {
@@ -142,18 +143,24 @@
                 if (gruppi.length === 0) {
                     const row = gruppiRispostaTableBody.insertRow();
                     const cell = row.insertCell(0);
-                    cell.colSpan = 5; // Numero di colonne nella tabella
+                    cell.colSpan = 6; // Numero di colonne nella tabella
                     cell.textContent = "Nessun gruppo risposta trovato.";
                     cell.classList.add('text-center', 'text-muted');
                 } else {
                     gruppi.forEach(gruppo => {
                         const row = gruppiRispostaTableBody.insertRow();
+                        
+                        // Estrai e formatta le descrizioni delle risposte associate
+                        const risposte_descrs = gruppo.risposte_associate.map(r => r.descr);
+                        const risposte_text = risposte_descrs.length > 0 ? risposte_descrs.join(', ') : 'Nessuna';
+                        
                         row.insertCell(0).textContent = gruppo.id;
                         row.insertCell(1).textContent = gruppo.descr;
-                        row.insertCell(2).textContent = formatDate(gruppo.data_ultima_modifica);
-                        row.insertCell(3).textContent = gruppo.modificato_da || '';
+                        row.insertCell(2).textContent = risposte_text;
+                        row.insertCell(3).textContent = formatDate(gruppo.data_ultima_modifica);
+                        row.insertCell(4).textContent = gruppo.modificato_da || '';
 
-                        const actionsCell = row.insertCell(4);
+                        const actionsCell = row.insertCell(5);
                         actionsCell.classList.add('d-flex', 'gap-1', 'justify-content-center');
 
                         const editBtn = document.createElement('button');

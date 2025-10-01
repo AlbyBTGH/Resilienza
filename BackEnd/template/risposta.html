@@ -1,0 +1,304 @@
+{% extends "index.html" %}
+
+{% block title %}Gestione Risposte{% endblock title %}
+
+{% block head_extra %}
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <style>
+        /* Nasconde la colonna ID */
+        #risposteTable th:first-child,
+        #risposteTable td:first-child {
+            display: none;
+        }
+
+        /* Regola per la tabella: evita che il testo vada a capo e tronca con l'ellissi */
+        #risposteTable th,
+        #risposteTable td {
+            font-size: 0.85em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Nuova regola per il modulo: adatta il font delle etichette e degli input */
+        .card-body .form-label,
+        .card-body .form-control,
+        .card-body .select2-container .select2-selection__rendered,
+        .card-body .btn {
+            font-size: 0.85em;
+        }
+    </style>
+{% endblock head_extra %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="messages mb-3"></div>
+
+    <div class="d-flex justify-content-end align-items-center mb-4">
+        <a href="{{ url_for('appBT.index') }}" class="btn btn-info btn-sm">
+            <i class="fas fa-home me-2"></i> Torna alla Home
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <h3>Gestione Risposte</h3>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Dettagli Risposta</h5>
+                </div>
+                <div class="card-body">
+                    <form id="rispostaForm">
+                        <input type="hidden" id="rispostaId" name="rispostaId">
+                        <input type="hidden" id="csrf_token" name="csrf_token" value="{{ csrf_token }}">
+                        
+                        <div class="mb-3">
+                            <label for="descrRisposta" class="form-label">Descrizione Risposta</label>
+                            <input type="text" class="form-control" id="descrRisposta" name="descrRisposta" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="idGruppoRisposta" class="form-label">Gruppo Risposta</label>
+                            <select class="form-control" id="idGruppoRisposta" name="idGruppoRisposta" multiple="multiple" required></select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="pesoRisposta" class="form-label">Peso</label>
+                            <input type="number" class="form-control" id="pesoRisposta" name="pesoRisposta" step="0.01" value="0.00">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" id="salvaBtn">
+                            <i class="fas fa-save me-2"></i> Salva
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="resetFormBtn">
+                            <i class="fas fa-undo me-2"></i> Resetta
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-8 col-md-6">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">Elenco Risposte</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover" id="risposteTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Descrizione</th>
+                                    <th>Gruppo(i)</th>
+                                    <th>Peso</th>
+                                    <th>Modificato da</th>
+                                    <th>Data Ultima Modifica</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block scripts %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Forza lo stile del gradiente sullo sfondo all'avvio della pagina
+        document.body.style.backgroundImage = 'linear-gradient(to bottom, #f8f9fa, #e9ecef)';
+        document.body.style.backgroundAttachment = 'fixed';
+        
+        const RISPOSTA_API_URL = '/api/risposta/';
+        const GRUPPO_API_URL = '/api/risposta/gruppi';
+        const csrfToken = document.getElementById('csrf_token').value;
+        
+        const rispostaForm = document.getElementById('rispostaForm');
+        const risposteTableBody = document.querySelector('#risposteTable tbody');
+        const rispostaIdInput = document.getElementById('rispostaId');
+        const descrRispostaInput = document.getElementById('descrRisposta');
+        const pesoRispostaInput = document.getElementById('pesoRisposta');
+        const resetFormBtn = document.getElementById('resetFormBtn');
+        const idGruppoRispostaSelect = $('#idGruppoRisposta');
+
+        function showFlashMessage(message, category) {
+            const messagesDiv = document.querySelector('.messages');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${category} alert-dismissible fade show`;
+            alertDiv.setAttribute('role', 'alert');
+            alertDiv.textContent = message;
+            alertDiv.innerHTML += '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+            messagesDiv.appendChild(alertDiv);
+        }
+
+        async function loadGruppiForSelect() {
+            try {
+                const response = await fetch(GRUPPO_API_URL);
+                if (!response.ok) {
+                    throw new Error('Errore nel caricamento dei gruppi di risposta');
+                }
+                const gruppi = await response.json();
+                idGruppoRispostaSelect.select2({
+                    data: gruppi.map(g => ({ id: g.id, text: g.descr })),
+                    placeholder: "Seleziona uno o più gruppi",
+                    allowClear: true
+                });
+            } catch (error) {
+                console.error("Errore nel caricamento dei gruppi per la select:", error);
+                showFlashMessage(`Errore nel caricamento dei gruppi: ${error.message}`, 'danger');
+            }
+        }
+
+        async function loadRisposte() {
+            try {
+                const response = await fetch(RISPOSTA_API_URL);
+                if (!response.ok) {
+                    throw new Error('Errore nel recupero delle risposte');
+                }
+                const risposte = await response.json();
+                risposteTableBody.innerHTML = '';
+                if (risposte.length > 0) {
+                    risposte.forEach(r => {
+                        const row = risposteTableBody.insertRow();
+                        
+                        // Formatta la data nel formato dd/mm/yyyy
+                        const dataModifica = new Date(r.data_ultima_modifica);
+                        const dataFormattata = dataModifica.toLocaleDateString('it-IT');
+                        
+                        row.innerHTML = `
+                            <td>${r.id}</td>
+                            <td>${r.descr}</td>
+                            <td>${r.gruppi_risposta_descr.join(', ')}</td>
+                            <td>${r.peso}</td>
+                            <td>${r.modificato_da}</td>
+                            <td>${dataFormattata}</td>
+                            <td>
+                                <button class="btn btn-sm btn-warning edit-btn" data-id="${r.id}"><i class="fas fa-edit"></i></button>
+                                <button class="btn btn-sm btn-danger delete-btn" data-id="${r.id}"><i class="fas fa-trash"></i></button>
+                            </td>
+                        `;
+                    });
+                } else {
+                    risposteTableBody.innerHTML = '<tr><td colspan="7" class="text-center">Nessuna risposta trovata.</td></tr>';
+                }
+            } catch (error) {
+                console.error("Errore nel recupero delle risposte:", error);
+                showFlashMessage(`Errore nel recupero dei dati: ${error.message}`, 'danger');
+            }
+        }
+
+        async function saveData(data, method, url) {
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    showFlashMessage(`Risposta salvata correttamente.`, 'success');
+                    rispostaForm.reset();
+                    rispostaIdInput.value = '';
+                    $(idGruppoRispostaSelect).val(null).trigger('change');
+                    loadRisposte();
+                } else {
+                    showFlashMessage(`Errore: ${result.error || response.statusText}`, 'danger');
+                }
+            } catch (error) {
+                console.error("Errore nella richiesta API:", error);
+                showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
+            }
+        }
+
+        rispostaForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const id = rispostaIdInput.value;
+            const descr = descrRispostaInput.value;
+            const peso = parseFloat(pesoRispostaInput.value);
+            const gruppi_risposta_ids = idGruppoRispostaSelect.val().map(Number);
+            
+            if (gruppi_risposta_ids.length === 0) {
+                showFlashMessage('Seleziona almeno un gruppo di risposta.', 'warning');
+                return;
+            }
+
+            const data = {
+                descr: descr,
+                gruppi_risposta_ids: gruppi_risposta_ids,
+                peso: peso
+            };
+
+            if (id) {
+                await saveData(data, 'PUT', `${RISPOSTA_API_URL}${id}`);
+            } else {
+                await saveData(data, 'POST', RISPOSTA_API_URL);
+            }
+        });
+
+        risposteTableBody.addEventListener('click', async (event) => {
+            if (event.target.closest('.edit-btn')) {
+                const id = event.target.closest('.edit-btn').getAttribute('data-id');
+                try {
+                    const response = await fetch(`${RISPOSTA_API_URL}${id}`);
+                    const risposta = await response.json();
+                    if (response.ok) {
+                        rispostaIdInput.value = risposta.id;
+                        descrRispostaInput.value = risposta.descr;
+                        pesoRispostaInput.value = risposta.peso;
+                        $(idGruppoRispostaSelect).val(risposta.gruppi_risposta_ids).trigger('change');
+                    } else {
+                        showFlashMessage(`Errore nel recupero dei dati per la modifica: ${risposta.error || ''}`, 'danger');
+                    }
+                } catch (error) {
+                    console.error("Errore nella richiesta API get by ID:", error);
+                    showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
+                }
+            } else if (event.target.closest('.delete-btn')) {
+                const id = event.target.closest('.delete-btn').getAttribute('data-id');
+                if (confirm(`Sei sicuro di voler eliminare la risposta con ID ${id}?`)) {
+                    try {
+                        const response = await fetch(`${RISPOSTA_API_URL}${id}`, {
+                            method: 'DELETE',
+                            headers: { 'X-CSRFToken': csrfToken }
+                        });
+                        const result = await response.json();
+                        if (response.ok) {
+                            showFlashMessage('Risposta eliminata correttamente.', 'success');
+                            loadRisposte();
+                        } else {
+                            showFlashMessage(`Errore nell'eliminazione della risposta: ${result.error || ''}`, 'danger');
+                        }
+                    } catch (error) {
+                        console.error("Errore nella richiesta API delete risposta:", error);
+                        showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
+                    }
+                }
+            }
+        });
+
+        resetFormBtn.addEventListener('click', () => {
+            rispostaForm.reset();
+            rispostaIdInput.value = '';
+            $(idGruppoRispostaSelect).val(null).trigger('change');
+        });
+
+        loadGruppiForSelect().then(() => loadRisposte());
+    });
+</script>
+{% endblock scripts %}
