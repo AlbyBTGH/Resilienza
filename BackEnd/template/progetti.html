@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="container mt-4">
-    <div class="messages mb-3"></div>
+    <div id="alertBox" class="mb-3"></div>
 
     <div class="d-flex justify-content-end align-items-center mb-4">
         <a href="{{ url_for('appBT.index') }}" class="btn btn-info btn-sm">
@@ -12,18 +12,28 @@
         </a>
     </div>
 
+    <!-- FORM -->
     <div class="card mb-4 shadow-sm">
-        <div class="card-header bg-primary text-white">
-            <h5 class="mb-0">Aggiungi / Modifica Progetto</h5>
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0" id="formTitle">Aggiungi Progetto</h5>
         </div>
         <div class="card-body">
             <form id="progettoForm">
                 <input type="hidden" id="progettoId">
                 <input type="hidden" id="csrf_token" name="csrf_token" value="{{ csrf_token }}">
+                
                 <div class="mb-3">
                     <label for="descr" class="form-label">Descrizione Progetto</label>
                     <input type="text" class="form-control" id="descr" required>
                 </div>
+                
+                <div class="mb-3">
+                    <label for="id_cliente" class="form-label">Cliente *</label>
+                    <select class="form-select" id="id_cliente" required>
+                        <option value="">Seleziona un cliente</option>
+                    </select>
+                </div>
+
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <label for="dt_inizio" class="form-label">Data Inizio</label>
@@ -34,287 +44,270 @@
                         <input type="date" class="form-control" id="dt_fine">
                     </div>
                 </div>
+
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <label for="id_stato" class="form-label">Stato Progetto</label>
-                        <select class="form-select" id="id_stato" required>
-                             </select>
+                        <select class="form-select" id="id_stato">
+                            <option value="">Seleziona uno stato</option>
+                        </select>
                     </div>
                     <div class="col-md-6">
-                        <label for="id_ambito" class="form-label">Ambito</label>
-                        <select class="form-select" id="id_ambito" required></select>
+                        <label for="id_ambito" class="form-label">Ambito *</label>
+                        <select class="form-select" id="id_ambito" required>
+                            <option value="">Seleziona un ambito</option>
+                        </select>
                     </div>
                 </div>
+                
                 <div class="mb-3">
                     <label for="ref_cliente" class="form-label">Riferimento Cliente</label>
                     <input type="text" class="form-control" id="ref_cliente">
                 </div>
-                <div class="mb-3">
-                    <label for="modificato_da" class="form-label">Modificato Da</label>
-                    <input type="text" class="form-control" id="modificato_da">
-                </div>
-                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                    <button type="submit" class="btn btn-success me-md-2">Salva Progetto</button>
-                    <button type="button" class="btn btn-secondary" id="resetFormBtn">Cancella</button>
-                </div>
+
+                <button type="submit" id="btnSalva" class="btn btn-success me-2">
+                    <i class="fas fa-save me-1"></i> Salva
+                </button>
+                <button type="button" class="btn btn-secondary" id="resetForm">
+                    <i class="fas fa-undo me-1"></i> Annulla
+                </button>
             </form>
         </div>
     </div>
 
+    <!-- FILTRI E TABELLA -->
     <div class="card shadow-sm">
-        <div class="card-header bg-success text-white">
+        <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
             <h5 class="mb-0">Elenco Progetti</h5>
+            <input type="text" id="searchInput" class="form-control w-50" placeholder="Cerca per nome o cliente...">
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-hover table-striped" id="progettiTable">
-                    <thead>
+                <table class="table table-striped table-hover align-middle" id="progettiTable">
+                    <thead class="table-light">
                         <tr>
                             <th>ID</th>
                             <th>Descrizione</th>
+                            <th>Cliente</th>
                             <th>Data Inizio</th>
                             <th>Data Fine</th>
                             <th>Stato</th>
                             <th>Ambito</th>
-                            <th>Cliente</th>
+                            <th>Rif. Cliente</th>
                             <th>Modificato Da</th>
                             <th>Ultima Modifica</th>
                             <th>Azioni</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        </tbody>
+                    <tbody id="progettiTableBody"></tbody>
                 </table>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                <button id="prevPage" class="btn btn-outline-secondary btn-sm">«</button>
+                <span id="pageInfo"></span>
+                <button id="nextPage" class="btn btn-outline-secondary btn-sm">»</button>
             </div>
         </div>
     </div>
 </div>
+{% endblock content %}
 
+{% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
+const PROGETTI_API_URL = "{{ url_for('progetto.get_all_progetti') }}";
+const CLIENTI_API_URL = "{{ url_for('cliente.get_all_clienti') }}";
+const PROGETTO_API_BASE_URL = "/api/progetto/";
 
-        const API_URL = 'http://127.0.0.1:5000/api/progetto/';
-        const AMBITI_API_URL = 'http://127.0.0.1:5000/api/ambito/';
+const form = document.getElementById('progettoForm');
+const btnSalva = document.getElementById('btnSalva');
+const formTitle = document.getElementById('formTitle');
+const alertBox = document.getElementById('alertBox');
+const searchInput = document.getElementById('searchInput');
+const pageInfo = document.getElementById('pageInfo');
+const progettiTableBody = document.getElementById('progettiTableBody');
+const csrfToken = document.getElementById('csrf_token').value;
+let allProgetti = [], filteredProgetti = [];
+let currentPage = 1;
+const pageSize = 5;
 
-        const csrfToken = document.getElementById('csrf_token').value;
-        const progettoForm = document.getElementById('progettoForm');
-        const progettoIdInput = document.getElementById('progettoId');
-        const descrInput = document.getElementById('descr');
-        const dtInizioInput = document.getElementById('dt_inizio');
-        const dtFineInput = document.getElementById('dt_fine');
-        const idStatoInput = document.getElementById('id_stato');
-        const idAmbitoSelect = document.getElementById('id_ambito');
-        const refClienteInput = document.getElementById('ref_cliente');
-        const modificatoDaInput = document.getElementById('modificato_da');
-        const progettiTableBody = document.querySelector('#progettiTable tbody');
-        const resetFormBtn = document.getElementById('resetFormBtn');
+function showAlert(msg, type = 'success') {
+    alertBox.innerHTML = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${msg}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>`;
+    setTimeout(() => alertBox.innerHTML = '', 4000);
+}
 
-        function showFlashMessage(message, category) {
-            const messagesContainer = document.querySelector('.messages');
-            const alertDiv = document.createElement('div');
-            alertDiv.className = `alert alert-${category} alert-dismissible fade show`;
-            alertDiv.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>`;
-            messagesContainer.appendChild(alertDiv);
-            setTimeout(() => {
-                alertDiv.classList.remove('show');
-                alertDiv.classList.add('fade');
-                alertDiv.remove();
-            }, 5000);
-        }
+function renderTable() {
+    const start = (currentPage - 1) * pageSize;
+    const paginated = filteredProgetti.slice(start, start + pageSize);
+    progettiTableBody.innerHTML = '';
 
-        async function loadAmbiti() {
-            try {
-                const response = await fetch(AMBITI_API_URL);
-                const ambiti = await response.json();
-                idAmbitoSelect.innerHTML = ''; // Pulisci le opzioni esistenti
-                ambiti.forEach(ambito => {
-                    const option = document.createElement('option');
-                    option.value = ambito.id;
-                    option.textContent = ambito.descrizione;
-                    idAmbitoSelect.appendChild(option);
-                });
-            } catch (error) {
-                console.error("Errore nel caricamento degli ambiti:", error);
-                showFlashMessage("Errore nel caricamento degli ambiti.", 'danger');
-            }
-        }
-
-        // Funzione per formattare la data da yyyy-mm-dd a dd/mm/yyyy
-        function formatDate(dateString) {
-            if (!dateString) return '';
-            const [year, month, day] = dateString.split('-');
-            return `${day}/${month}/${year}`;
-        }
-
-        async function loadProgetti() {
-            try {
-                const response = await fetch(API_URL);
-                const progetti = await response.json();
-                progettiTableBody.innerHTML = '';
-                progetti.forEach(progetto => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${progetto.id}</td>
-                        <td>${progetto.descr}</td>
-                        <td>${formatDate(progetto.dt_inizio)}</td>
-                        <td>${formatDate(progetto.dt_fine)}</td>
-                        <td>${progetto.stato_descr || ''}</td>
-                        <td>${progetto.ambito_descr}</td>
-                        <td>${progetto.ref_cliente || ''}</td>
-                        <td>${progetto.modificato_da || ''}</td>
-                        <td>${formatDate(progetto.data_ultima_modifica.split('T')[0])}</td>
-                        <td>
-                            <button class="btn btn-warning btn-sm edit-btn" data-id="${progetto.id}">Modifica</button>
-                            <button class="btn btn-danger btn-sm delete-btn" data-id="${progetto.id}">Elimina</button>
-                        </td>
-                    `;
-                    progettiTableBody.appendChild(row);
-                });
-
-                document.querySelectorAll('.edit-btn').forEach(button => {
-                    button.addEventListener('click', async (e) => {
-                        const id = e.target.dataset.id;
-                        await editProgetto(id);
-                    });
-                });
-
-                document.querySelectorAll('.delete-btn').forEach(button => {
-                    button.addEventListener('click', async (e) => {
-                        const id = e.target.dataset.id;
-                        await deleteProgetto(id);
-                    });
-                });
-            } catch (error) {
-                console.error("Errore nel caricamento dei progetti:", error);
-                showFlashMessage("Errore nel caricamento dei progetti.", 'danger');
-            }
-        }
-
-        async function editProgetto(id) {
-            try {
-                const response = await fetch(`${API_URL}${id}`);
-                const progetto = await response.json();
-                progettoIdInput.value = progetto.id;
-                descrInput.value = progetto.descr;
-                dtInizioInput.value = progetto.dt_inizio;
-                dtFineInput.value = progetto.dt_fine;
-                idStatoInput.value = progetto.id_stato;
-                idAmbitoSelect.value = progetto.id_ambito;
-                refClienteInput.value = progetto.ref_cliente;
-                modificatoDaInput.value = progetto.modificato_da;
-
-                // Scrolla in cima per vedere il form
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            } catch (error) {
-                console.error("Errore nel caricamento del progetto per la modifica:", error);
-                showFlashMessage("Errore nel caricamento del progetto per la modifica.", 'danger');
-            }
-        }
-
-        progettoForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const id = progettoIdInput.value;
-            const method = id ? 'PUT' : 'POST';
-            const url = id ? `${API_URL}${id}` : API_URL;
-
-            const data = {
-                descr: descrInput.value,
-                dt_inizio: dtInizioInput.value,
-                dt_fine: dtFineInput.value,
-                id_stato: idStatoInput.value ? parseInt(idStatoInput.value) : null,
-                id_ambito: idAmbitoSelect.value ? parseInt(idAmbitoSelect.value) : null,
-                ref_cliente: refClienteInput.value,
-                modificato_da: modificatoDaInput.value,
-            };
-
-            try {
-                const response = await fetch(url, {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken
-                    },
-                    body: JSON.stringify(data)
-                });
-
-                const result = await response.json();
-                if (response.ok) {
-                    showFlashMessage('Operazione effettuata correttamente', 'success');
-                    progettoForm.reset();
-                    progettoIdInput.value = '';
-                    loadProgetti();
-                } else {
-                    showFlashMessage(`Errore: ${result.error || response.statusText}`, 'danger');
-                }
-            } catch (error) {
-                console.error("Errore nella richiesta API:", error);
-                showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
-            }
-        });
-
-        async function deleteProgetto(id) {
-            if (!confirm('Sei sicuro di voler eliminare questo progetto? Operazione irreversibile!')) {
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API_URL}${id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'X-CSRFToken': csrfToken
-                    }
-                });
-
-                const result = await response.json();
-                if (response.ok) {
-                    showFlashMessage('Operazione effettuata correttamente', 'success');
-                    loadProgetti();
-                } else {
-                    showFlashMessage(`Errore eliminazione del progetto: ${result.error || ''}`, 'danger');
-                }
-            } catch (error) {
-                console.error("Errore nella richiesta API delete:", error);
-                showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
-            }
-        }
-
-        async function loadStatiProgetto() {
-            const statoProgettoSelect = document.getElementById('id_stato');
-            // Pulisci le opzioni esistenti, se presenti
-            statoProgettoSelect.innerHTML = '';
-    
-            // Aggiungi l'opzione di default
-            const defaultOption = document.createElement('option');
-            defaultOption.value = '';
-            defaultOption.textContent = 'Seleziona uno stato';
-            statoProgettoSelect.appendChild(defaultOption);
-
-            try {
-                const response = await fetch('/api/stati_progetto/');
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const stati = await response.json();
-                stati.forEach(stato => {
-                    const option = document.createElement('option');
-                    option.value = stato.id;
-                    option.textContent = stato.descr;
-                    statoProgettoSelect.appendChild(option);
-                });
-            } catch (error) {
-                console.error("Errore nel caricamento degli stati progetto:", error);
-            }
-        }
-
-        resetFormBtn.addEventListener('click', () => {
-            progettoForm.reset();
-            progettoIdInput.value = '';
-        });
-
-        // Carica la lista degli ambiti e dei progetti all avvio della pagina
-        loadAmbiti();
-        loadStatiProgetto();
-        loadProgetti();
+    paginated.forEach(p => {
+        const dtInizio = p.dt_inizio ? p.dt_inizio.substring(0, 10) : '';
+        const dtFine = p.dt_fine ? p.dt_fine.substring(0, 10) : '';
+        const mod = p.data_ultima_modifica ? p.data_ultima_modifica.substring(0, 10) : '';
+        progettiTableBody.innerHTML += `
+            <tr>
+                <td>${p.id}</td>
+                <td>${p.descr || ''}</td>
+                <td>${p.cliente_descr || '—'}</td>
+                <td>${dtInizio}</td>
+                <td>${dtFine}</td>
+                <td>${p.stato_descr || '—'}</td>
+                <td>${p.ambito_descr || '—'}</td>
+                <td>${p.ref_cliente || ''}</td>
+                <td>${p.modificato_da || ''}</td>
+                <td>${mod}</td>
+                <td>
+                    <button class="btn btn-warning btn-sm me-1 edit-btn" data-id="${p.id}">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-danger btn-sm delete-btn" data-id="${p.id}">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>`;
     });
+
+    const totalPages = Math.ceil(filteredProgetti.length / pageSize);
+    pageInfo.textContent = `Pagina ${currentPage} di ${totalPages || 1}`;
+}
+
+// Caricamento dati
+async function loadProgetti() {
+    const res = await fetch(PROGETTI_API_URL);
+    allProgetti = await res.json();
+    filteredProgetti = allProgetti;
+    currentPage = 1;
+    renderTable();
+}
+
+async function loadClienti() {
+    const res = await fetch(CLIENTI_API_URL);
+    const clienti = await res.json();
+    const select = document.getElementById('id_cliente');
+    select.innerHTML = '<option value="">Seleziona un cliente</option>';
+    clienti.forEach(c => {
+        select.innerHTML += `<option value="${c.id}">${c.ragione_sociale || c.descr}</option>`;
+    });
+}
+
+async function loadAmbiti() {
+    const res = await fetch('/api/ambito/');
+    const ambiti = await res.json();
+    const select = document.getElementById('id_ambito');
+    select.innerHTML = '<option value="">Seleziona un ambito</option>';
+    ambiti.forEach(a => select.innerHTML += `<option value="${a.id}">${a.descr}</option>`);
+}
+
+async function loadStati() {
+    const res = await fetch('/api/stati_progetto/');
+    const stati = await res.json();
+    const select = document.getElementById('id_stato');
+    select.innerHTML = '<option value="">Seleziona uno stato</option>';
+    stati.forEach(s => select.innerHTML += `<option value="${s.id}">${s.descr}</option>`);
+}
+
+// Edit
+async function handleEdit(id) {
+    const res = await fetch(`${PROGETTO_API_BASE_URL}${id}`);
+    const p = await res.json();
+    document.getElementById('progettoId').value = p.id;
+    document.getElementById('descr').value = p.descr;
+    document.getElementById('id_cliente').value = p.id_cliente;
+    document.getElementById('dt_inizio').value = p.dt_inizio?.substring(0, 10) || '';
+    document.getElementById('dt_fine').value = p.dt_fine?.substring(0, 10) || '';
+    document.getElementById('id_stato').value = p.id_stato || '';
+    document.getElementById('id_ambito').value = p.id_ambito || '';
+    document.getElementById('ref_cliente').value = p.ref_cliente || '';
+    formTitle.textContent = "Modifica Progetto";
+    form.scrollIntoView({ behavior: 'smooth' });
+}
+
+// Delete
+async function handleDelete(id) {
+    if (!confirm('Sei sicuro di voler eliminare questo progetto?')) return;
+    const res = await fetch(`${PROGETTO_API_BASE_URL}${id}`, { method: 'DELETE', headers: {'X-CSRFToken': csrfToken}});
+    const r = await res.json();
+    if (res.ok) { showAlert('Progetto eliminato.'); loadProgetti(); }
+    else showAlert(r.error || 'Errore eliminazione', 'danger');
+}
+
+// Submit form
+form.addEventListener('submit', async e => {
+    e.preventDefault();
+    btnSalva.disabled = true;
+    const id = document.getElementById('progettoId').value;
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `${PROGETTO_API_BASE_URL}${id}` : PROGETTO_API_BASE_URL;
+    const data = {
+        descr: document.getElementById('descr').value,
+        id_cliente: document.getElementById('id_cliente').value,
+        id_ambito: document.getElementById('id_ambito').value,
+        id_stato: document.getElementById('id_stato').value || null,
+        dt_inizio: document.getElementById('dt_inizio').value || null,
+        dt_fine: document.getElementById('dt_fine').value || null,
+        ref_cliente: document.getElementById('ref_cliente').value || null
+    };
+    if (!data.id_cliente) { showAlert('Cliente obbligatorio', 'danger'); btnSalva.disabled = false; return; }
+    if (!data.id_ambito) { showAlert('Ambito obbligatorio', 'danger'); btnSalva.disabled = false; return; }
+
+    const res = await fetch(url, {
+        method,
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+        body: JSON.stringify(data)
+    });
+    const r = await res.json();
+    if (res.ok) {
+        showAlert(`Progetto ${id ? 'aggiornato' : 'creato'} con successo.`);
+        form.reset();
+        document.getElementById('progettoId').value = '';
+        formTitle.textContent = "Aggiungi Progetto";
+        loadProgetti();
+    } else showAlert(r.error || 'Errore salvataggio', 'danger');
+    btnSalva.disabled = false;
+});
+
+// Reset
+document.getElementById('resetForm').addEventListener('click', () => {
+    form.reset();
+    document.getElementById('progettoId').value = '';
+    formTitle.textContent = "Aggiungi Progetto";
+});
+
+// Eventi tabella
+progettiTableBody.addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const id = btn.dataset.id;
+    if (btn.classList.contains('edit-btn')) handleEdit(id);
+    if (btn.classList.contains('delete-btn')) handleDelete(id);
+});
+
+// Ricerca
+searchInput.addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    filteredProgetti = allProgetti.filter(p =>
+        p.descr?.toLowerCase().includes(q) ||
+        p.cliente_descr?.toLowerCase().includes(q)
+    );
+    currentPage = 1;
+    renderTable();
+});
+
+// Paginazione
+document.getElementById('prevPage').addEventListener('click', () => {
+    if (currentPage > 1) { currentPage--; renderTable(); }
+});
+document.getElementById('nextPage').addEventListener('click', () => {
+    const totalPages = Math.ceil(filteredProgetti.length / pageSize);
+    if (currentPage < totalPages) { currentPage++; renderTable(); }
+});
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await Promise.all([loadClienti(), loadAmbiti(), loadStati(), loadProgetti()]);
+});
 </script>
 {% endblock %}

@@ -1,5 +1,6 @@
 # BackEnd/Classi/ClasseAnagrafica/ClasseAmbito/Domain_t_ambito.py
 from sqlalchemy import Column, Integer, String, DateTime, Text
+from sqlalchemy.orm import relationship
 from Classi.ClasseDB.db_connection import Base
 from datetime import datetime # AGGIUNTO: Importa la classe datetime
 
@@ -13,6 +14,11 @@ class TAmbito(Base):
     note = Column('NOTE', Text, nullable=True) # AGGIUNTO: Mappato a 'NOTE'
     data_ultima_modifica = Column('DATA_ULTIMA_MODIFICA', DateTime, default=datetime.now, onupdate=datetime.now, nullable=True) # AGGIUNTO
     modificato_da = Column('MODIFICATO_DA', String(100), nullable=True) # AGGIUNTO
+
+    # NUOVO: Relazione uno-a-molti: un Ambito ha molti Progetti.
+    # Il parametro "TProgetto" è il nome della classe del modello progetto.
+    # back_populates="ambito" indica che sul lato TProgetto l'attributo si chiama 'ambito'.
+    progetti = relationship("TProgetto", back_populates="ambito")
 
     def __repr__(self):
         return f"<TAmbito(id={self.id}, acronimo='{self.codice}', descrizione='{self.descrizione}')>"

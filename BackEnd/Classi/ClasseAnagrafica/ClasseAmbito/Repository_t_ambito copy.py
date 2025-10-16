@@ -1,4 +1,4 @@
-# BackEnd/Classi/ClasseAnagrafica/ClasseAmbito/Repository_t_ambito.py
+# Classi/ClasseAnagrafica/ClasseAmbito/Repository_t_ambito.py
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
 from Classi.ClasseDB.db_connection import engine
@@ -32,29 +32,13 @@ class Repository_t_ambito:
                 ambiti_data.append({
                     'id': ambito.id,
                     'codice': ambito.codice,
-                    # NOTE: utilizziamo 'descr' per essere compatibili con il JS della pagina progetti.html
-                    'descr': ambito.descrizione if hasattr(ambito, 'descrizione') else getattr(ambito, 'descrizione', None) or ambito.descrizione if False else ambito.descrizione if False else ambito.descrizione if False else ambito.descrizione,
-                    # The above messy fallback is to guard against attribute naming; but below we standardize:
-                    # safer direct mapping:
-                })
-            # The above block used an awkward fallback; instead, rebuild properly:
-            ambiti_data = []
-            for ambito in ambiti_db:
-                # some ORM models use attribute 'descrizione' (if class differs); our Domain_t_ambito uses 'descrizione' attribute name
-                descr_val = getattr(ambito, 'descrizione', None)
-                if descr_val is None:
-                    # maybe attribute name is 'descr' in other models; try that
-                    descr_val = getattr(ambito, 'descr', None)
-                ambiti_data.append({
-                    'id': ambito.id,
-                    'codice': ambito.codice,
-                    'descr': descr_val,
+                    'descrizione': ambito.descrizione,
                     'note': ambito.note,
                     'data_ultima_modifica': ambito.data_ultima_modifica.isoformat() if ambito.data_ultima_modifica else None,
                     'modificato_da': ambito.modificato_da
                 })
             logging.info(f"Recuperati {len(ambiti_data)} ambiti (come dizionari).")
-            return ambiti_data
+            return ambiti_data # Restituisce una lista di dizionari
         except SQLAlchemyError as e:
             logging.error(f"Errore nel recupero di tutti gli ambiti: {str(e)}")
             raise
@@ -67,11 +51,10 @@ class Repository_t_ambito:
         try:
             ambito = session.query(TAmbito).filter_by(id=ambito_id).first()
             if ambito:
-                descr_val = getattr(ambito, 'descrizione', None) or getattr(ambito, 'descr', None)
                 return {
                     'id': ambito.id,
                     'codice': ambito.codice,
-                    'descr': descr_val,
+                    'descrizione': ambito.descrizione,
                     'note': ambito.note,
                     'data_ultima_modifica': ambito.data_ultima_modifica.isoformat() if ambito.data_ultima_modifica else None,
                     'modificato_da': ambito.modificato_da
@@ -123,7 +106,7 @@ class Repository_t_ambito:
             return {
                 'id': new_ambito.id,
                 'codice': new_ambito.codice,
-                'descr': new_ambito.descrizione,
+                'descrizione': new_ambito.descrizione,
                 'note': new_ambito.note,
                 'data_ultima_modifica': new_ambito.data_ultima_modifica.isoformat() if new_ambito.data_ultima_modifica else None,
                 'modificato_da': new_ambito.modificato_da
@@ -151,7 +134,7 @@ class Repository_t_ambito:
                 return {
                     'id': ambito.id,
                     'codice': ambito.codice,
-                    'descr': ambito.descrizione,
+                    'descrizione': ambito.descrizione,
                     'note': ambito.note,
                     'data_ultima_modifica': ambito.data_ultima_modifica.isoformat() if ambito.data_ultima_modifica else None,
                     'modificato_da': ambito.modificato_da

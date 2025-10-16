@@ -27,8 +27,7 @@ from flask_wtf.csrf import CSRFProtect
 from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import DataRequired, Email
 
-# Importare i modelli (Domain) e i servizi
-# Assicurati che questi percorsi siano corretti rispetto alla tua struttura di progetto
+# Import modelli (Domain) e servizi
 from Classi.ClasseDB.db_connection import Base, engine, SessionLocal
 from Classi.Classe_menu_principale.Domain_t_menu_principale import TMenuPrincipale
 from Classi.ClasseUtenti.Classe_t_funzionalita.Domain_t_funzionalita import TFunzionalita
@@ -48,19 +47,19 @@ from Classi.ClasseAnagrafica.ClasseDriver.Domain_t_driver import TDriver
 # Import del Domain per Domanda
 from Classi.ClasseAnagrafica.ClasseDomanda.Domain_t_domanda import TDomanda
 
-# ### INIZIO AGGIUNTA PER GRUPPO_RISPOSTA ###
+# GRUPPO_RISPOSTA ###
 from Classi.ClasseAnagrafica.ClasseGruppoRisposta.Domain_t_gruppo_risposta import TGruppoRisposta
-# ### FINE AGGIUNTA PER GRUPPO_RISPOSTA ###
 
 # Import del Domain per Caricamento Dati # AGGIUNTO
 from Classi.Classe_dati_caricamento.Domain_t_dati_caricamento import TDatiCaricamento
 
 # Importa il nuovo controller per la gestione dei progetti
 from Classi.ClasseAnagrafica.ClasseProgetto.Controller_t_progetto import t_progetto_controller
+
 # Importa il modello per la tabella PROGETTO
 from Classi.ClasseAnagrafica.ClasseProgetto.Domain_t_progetto import TProgetto
 
-# Servizi e Repository
+
 from Classi.Classe_menu_principale.Service_t_menu_principale import Service_t_menu_principale
 from Classi.ClasseUtenti.Classe_t_funzionalita.Service_t_funzionalita import Service_t_funzionalita
 from Classi.ClasseUtenti.Classe_t_funzionalitaUtenti.Service_t_funzionalitaUtente import Service_t_FunzionalitaUtente
@@ -82,29 +81,32 @@ from Classi.ClasseAnagrafica.ClasseDriver.Controller_t_driver import t_driver_co
 from Classi.ClasseAnagrafica.ClasseDomanda.Service_t_domanda import Service_t_domanda
 from Classi.ClasseAnagrafica.ClasseDomanda.Controller_t_domanda import t_domanda_controller
 
-# ### INIZIO AGGIUNTA PER GRUPPO_RISPOSTA ###
+# GRUPPO_RISPOSTA ###
 from Classi.ClasseAnagrafica.ClasseGruppoRisposta.Service_t_gruppo_risposta import Service_t_gruppo_risposta
 from Classi.ClasseAnagrafica.ClasseGruppoRisposta.Controller_t_gruppo_risposta import t_gruppo_risposta_controller
-# ### FINE AGGIUNTA PER GRUPPO_RISPOSTA ###
 
-# Import del Service per Caricamento Dati # AGGIUNTO
+# Import del Service per Caricamento Dati
 from Classi.Classe_dati_caricamento.Service_t_dati_caricamento import ServiceTDatiCaricamento
 
-# AGGIUNTA: Istanzia il servizio per la gestione dei progetti
+# gestione progetti
 from Classi.ClasseAnagrafica.ClasseProgetto.Service_t_progetto import Service_t_progetto
-
 from Classi.ClasseAnagrafica.ClasseAmbito.Controller_t_ambito import t_ambito_controller
-
 from Classi.ClasseAnagrafica.ClasseStatoProgetto.Controller_stati_progetto import t_stato_progetto_controller
-
 from Classi.ClasseQuestionario.Controller_t_questionario import t_questionario_controller
-
 from Classi.ClasseQuestionario.Domain_t_questionario import TQuestionario
-
 from sqlalchemy.orm import joinedload
-
 from Classi.ClasseAnagrafica.ClasseRisposta.Controller_t_risposta import t_risposta_controller
 from Classi.ClasseAnagrafica.ClasseRisposta.Service_t_risposta import Service_t_risposta
+
+# GESTIONE PROGETTI
+from Classi.ClasseAnagrafica.ClasseProgetto.Controller_t_progetto import t_progetto_controller
+from Classi.ClasseAnagrafica.ClasseProgetto.Domain_t_progetto import TProgetto
+from Classi.ClasseAnagrafica.ClasseCliente.Domain_t_cliente import TCliente # Necessario per TProgetto
+from Classi.ClasseAnagrafica.ClasseAmbito.Domain_t_ambito import TAmbito # Necessario per TProgetto
+from Classi.ClasseAnagrafica.ClasseStatoProgetto.Domain_t_stato_progetto import TStatoProgetto # Necessario per TProgetto
+
+#CLIENTI
+from Classi.ClasseAnagrafica.ClasseCliente.Controller_t_cliente import t_cliente_controller 
 
 # Inizializzazione del logging
 logging.basicConfig(level=logging.INFO)
@@ -924,11 +926,10 @@ if __name__ == '__main__':
     print("DEBUG: Registrando t_domanda_controller con prefisso /api/domanda")
     app.register_blueprint(t_domanda_controller, url_prefix='/api/domanda')
 
-    # ### INIZIO AGGIUNTA PER GRUPPO_RISPOSTA ###
+    # GRUPPO_RISPOSTA
     print("DEBUG: Registrando t_gruppo_risposta_controller con prefisso /api/gruppo_risposta")
     from Classi.ClasseAnagrafica.ClasseGruppoRisposta.Controller_t_gruppo_risposta import t_gruppo_risposta_controller
     app.register_blueprint(t_gruppo_risposta_controller, url_prefix='/api/gruppo-risposta')
-    # ### FINE AGGIUNTA PER GRUPPO_RISPOSTA ###
 
     # Registra il blueprint per la gestione dei progetti
     app.register_blueprint(t_progetto_controller, url_prefix='/api/progetto')
@@ -939,6 +940,10 @@ if __name__ == '__main__':
     app.register_blueprint(t_questionario_controller, url_prefix='/api/questionario')
 
     app.register_blueprint(t_risposta_controller, url_prefix='/api/risposta')
+
+    # app.register_blueprint(t_progetto_controller, url_prefix='/api/progetti')
+
+    app.register_blueprint(t_cliente_controller, url_prefix='/api/clienti')
     
     print("DEBUG: Registrando la rotta di upload 'upload_domande' con prefisso /api/domande/upload")
     app.add_url_rule('/api/domande/upload', 'upload_domande', upload_domande, methods=['POST'])

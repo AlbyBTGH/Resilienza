@@ -564,9 +564,6 @@ def crea_questionario():
     )
 
 
-
-
-
 # ### route GESTIONE QUESTIONARIO ###
 @appBT.route('/gestione_questionario/<int:questionario_id>', methods=['GET'])
 @login_required
@@ -797,6 +794,48 @@ def gestione_risposte():
     )
 
 
+
+
+
+@appBT.route("/domanda_gruppo", methods=['GET'])
+@login_required
+def gestione_domande_gruppo():
+    """
+    Renderizza la pagina di gestione dell'associazione Domanda-Gruppo di Risposta (gestione_domande_gruppo.html).
+    Passa i dati necessari per il menu dinamico e il token CSRF.
+    """
+    # Recupera i dati di sessione (come nelle altre rotte)
+    current_user_role_id = session.get('user_role_id')
+    current_user_email = session.get('user_email')
+    current_username = session.get('username')
+    current_user_role_descr = session.get('user_role_descr')
+
+    dynamic_menu = []
+    # Genera il menu dinamico solo se il ruolo è disponibile
+    if current_user_role_id is not None:
+        # **NOTA:** Assicurati che 'service_t_funzionalita_utente' sia importato nel tuo server.py
+        dynamic_menu = service_t_funzionalita_utente.build_menu_structure(role_id=current_user_role_id)
+    else:
+        print("DEBUG: Ruolo utente non definito in sessione per gestione_domande_gruppo. Menu vuoto.")
+
+    # Genera il token CSRF (come nelle altre rotte)
+    from flask_wtf.csrf import generate_csrf
+    csrf_token = generate_csrf() 
+
+    return render_template(
+        "gestione_domande_gruppo.html",  # Il template che ho creato
+        title="Gestione Associazione Domanda-Gruppo Risposta",
+        menu_data=dynamic_menu,
+        current_user_email=current_user_email,
+        current_username=current_username,
+        current_user_role_descr=current_user_role_descr,
+        csrf_token=csrf_token  # Passa il token al template
+    )
+
+
+
+
+
 def upload_domande():
     try:
         if 'file' not in request.files:
@@ -905,28 +944,17 @@ if __name__ == '__main__':
     app.add_url_rule('/api/domande/upload', 'upload_domande', upload_domande, methods=['POST'])
 
     try:
+        # Crea tutte le tabelle definite nei modelli (incluse Utenti, Ruoli, Funzionalita, etc.)
+        # Le tabelle di anagrafica (Ambito, Categoria, etc.) avranno solo lo schema creato qui, 
+        # ma l'assenza della logica di popolamento previene l'IntegrityError.
         Base.metadata.create_all(bind=engine)
         print("INFO: Tabelle del database create o già esistenti.")
-        # Assicurati che la tabella 'ambito' sia creata
-        service_t_ambito.create_table_if_not_exists()
-        print("INFO: Tabella 'ambito' creata o già esistente.")
-        # Assicurati che la tabella 'categoria' sia creata
-        service_t_categoria.create_table_if_not_exists()
-        print("INFO: Tabella 'categoria' creata o già esistente.")
-        # Assicurati che la tabella 'driver' sia creata
-        service_t_driver.create_table_if_not_exists()
-        print("INFO: Tabella 'driver' creata o già esistente.")
-        # Assicurati che la tabella 'domande' sia creata
-        service_t_domanda.create_table_if_not_exists()
-        print("INFO: Tabella 'domande' creata o già esistente.")
-        # ### INIZIO AGGIUNTA PER GRUPPO_RISPOSTA ###
-        service_t_gruppo_risposta.create_table_if_not_exists()
-        print("INFO: Tabella 'gruppo_risposta' creata o già esistente.")
-        # ### FINE AGGIUNTA PER GRUPPO_RISPOSTA ###
+        
         # AGGIUNTA: Assicurati che TProgetto sia importato e le tabelle create
+        # Nonostante Base.metadata.create_all, è spesso lasciato per ridondanza.
         TProgetto.__table__.create(bind=engine, checkfirst=True)
+        
         # Assicurati che la tabella 't_dati_caricamento' sia creata
-        # AGGIUNTO
         session_pop_caricamento = SessionLocal()
         try:
             TDatiCaricamento.__table__.create(bind=engine, checkfirst=True)
@@ -935,130 +963,12 @@ if __name__ == '__main__':
             print(f"ERRORE: Impossibile creare la tabella 't_dati_caricamento': {e}")
         finally:
             session_pop_caricamento.close()
-        # Popolamento dati di test per t_ambito
-        session_pop_ambito = SessionLocal()
-        try:
-            if not session_pop_ambito.query(TAmbito).first():
-                print("INFO: Popolamento dati di test per ambito...")
-                default_ambiti = [
-                    TAmbito(codice="AMB001", descrizione="Ambito di Test 1", note="Nota per AMB001"),
-                    TAmbito(codice="AMB002", descrizione="Ambito di Test 2", note="Nota per AMB002"),
-                    TAmbito(codice="AMB003", descrizione="Ambito di Test 3", note="Nota per AMB003")
-                ]
-                session_pop_ambito.add_all(default_ambiti)
-                session_pop_ambito.commit()
-                print("INFO: Dati di test per ambito popolati con successo.")
-            else:
-                print("INFO: Tabella 'ambito' già popolata, salto il popolamento dei dati di test.")
-        except Exception as e:
-            session_pop_ambito.rollback()
-            print(f"ERRORE: Errore durante il popolamento di ambito: {e}")
-        finally:
-            session_pop_ambito.close()
-        # Popolamento dati di test per t_categoria
-        session_pop_categoria = SessionLocal()
-        try:
-            existing_ambito_for_cat = session_pop_categoria.query(TAmbito).filter_by(codice="AMB001").first()
-            if not existing_ambito_for_cat:
-                # Se "Categoria di Test 1" non esiste, prova a recuperare o creare una "Categoria Default per Driver"
-                existing_ambito_for_cat = TAmbito(codice="DEFAULT_AMB", descrizione="Ambito Default per Categorie", note="Creato per test")
-                session_pop_categoria.add(existing_ambito_for_cat)
-                session_pop_categoria.commit()
-                session_pop_categoria.refresh(existing_ambito_for_cat)
-            if not session_pop_categoria.query(TCategoria).filter(TCategoria.descr.like("Categoria di Test %")).first(): # Modificato per evitare duplicati se ci sono altre categorie
-                print("INFO: Popolamento dati di test per categoria...")
-                default_categorie = [
-                    TCategoria(descr="Categoria di Test 1", tipo_categoria="Tipo A", id_ambito=existing_ambito_for_cat.id),
-                    TCategoria(descr="Categoria di Test 2", tipo_categoria="Tipo B", id_ambito=existing_ambito_for_cat.id),
-                    TCategoria(descr="Categoria di Test 3", tipo_categoria="Tipo A", id_ambito=existing_ambito_for_cat.id) # CORREZIONE QUI
-                ]
-                session_pop_categoria.add_all(default_categorie)
-                session_pop_categoria.commit()
-                print("INFO: Dati di test per categoria popolati con successo.")
-            else:
-                print("INFO: Tabella 'categoria' già popolata con categorie di test, salto il popolamento.")
-        except Exception as e:
-            session_pop_categoria.rollback()
-            print(f"ERRORE: Errore durante il popolamento di categoria: {e}")
-        finally:
-            session_pop_categoria.close()
-        # Popolamento dati di test per t_driver
-        session_pop_driver = SessionLocal()
-        try:
-            existing_categoria_for_driver = session_pop_driver.query(TCategoria).filter_by(descr="Categoria di Test 1").first()
-            if not existing_categoria_for_driver:
-                # Se "Categoria di Test 1" non esiste, prova a recuperare o creare una "Categoria Default per Driver"
-                existing_categoria_for_driver = session_pop_driver.query(TCategoria).filter_by(descr="Categoria Default per Driver").first()
-                if not existing_categoria_for_driver:
-                    # Assicurati che esista un ambito per questa categoria di default
-                    existing_ambito_for_cat_driver = session_pop_driver.query(TAmbito).filter_by(codice="DEFAULT_AMB").first()
-                    if not existing_ambito_for_cat_driver:
-                        existing_ambito_for_cat_driver = TAmbito(codice="DEFAULT_AMB", descrizione="Ambito Default per Categorie", note="Creato per test")
-                        session_pop_driver.add(existing_ambito_for_cat_driver)
-                        session_pop_driver.commit()
-                        session_pop_driver.refresh(existing_ambito_for_cat_driver)
-                    existing_categoria_for_driver = TCategoria(descr="Categoria Default per Driver", tipo_categoria="Default", id_ambito=existing_ambito_for_cat_driver.id)
-                    session_pop_driver.add(existing_categoria_for_driver)
-                    session_pop_driver.commit()
-                    session_pop_driver.refresh(existing_categoria_for_driver)
-            if not session_pop_driver.query(TDriver).filter(TDriver.descrizione.like("Driver di Test %")).first(): # Modificato per evitare duplicati
-                print("INFO: Popolamento dati di test per driver...")
-                default_drivers = [
-                    TDriver(ID_CATEGORIA=existing_categoria_for_driver.ID if existing_categoria_for_driver else 1, descrizione="Driver di Test 1", note="Note Driver 1"),
-                    TDriver(ID_CATEGORIA=existing_categoria_for_driver.ID if existing_categoria_for_driver else 1, descrizione="Driver di Test 2", note="Note Driver 2"),
-                    TDriver(ID_CATEGORIA=existing_categoria_for_driver.ID if existing_categoria_for_driver else 1, descrizione="Driver di Test 3", note="Note Driver 3")
-                ]
-                session_pop_driver.add_all(default_drivers)
-                session_pop_driver.commit()
-                print("INFO: Dati di test per driver popolati con successo.")
-            else:
-                print("INFO: Tabella 'driver' già popolata con driver di test, salto il popolamento.")
-        except Exception as e:
-            session_pop_driver.rollback()
-            print(f"ERRORE: Errore durante il popolamento di driver: {e}")
-        finally:
-            session_pop_driver.close()
-
-        # Popolamento dati di test per t_domanda
-        session_pop_domanda = SessionLocal()
-        try:
-            if not session_pop_domanda.query(TDomanda).first():
-                print("INFO: Popolamento dati di test per domanda...")
-                # Recupero di un driver esistente
-                existing_driver = session_pop_domanda.query(TDriver).first()
-                if not existing_driver:
-                    # Se non ci sono driver, ne crea uno di default per evitare errori
-                    print("ATTENZIONE: Nessun driver trovato. Creazione di un driver di default per le domande.")
-                    default_cat = session_pop_domanda.query(TCategoria).first()
-                    if not default_cat:
-                        default_cat = TCategoria(descr="Categoria Default", tipo_categoria="Default", id_ambito=session_pop_domanda.query(TAmbito).first().id)
-                        session_pop_domanda.add(default_cat)
-                        session_pop_domanda.commit()
-                        session_pop_domanda.refresh(default_cat)
-                    existing_driver = TDriver(ID_CATEGORIA=default_cat.ID, descrizione="Driver Default per Domande", note="Creato per test")
-                    session_pop_domanda.add(existing_driver)
-                    session_pop_domanda.commit()
-                    session_pop_domanda.refresh(existing_driver)
-
-                # Dati di test per le domande
-                default_domande = [
-                    TDomanda(descr="Domanda di test 1?", id_driver=existing_driver.ID, abilitato=True),
-                    TDomanda(descr="Domanda di test 2?", id_driver=existing_driver.ID, abilitato=True),
-                    TDomanda(descr="Domanda di test 3?", id_driver=existing_driver.ID, abilitato=False)
-                ]
-                session_pop_domanda.add_all(default_domande)
-                session_pop_domanda.commit()
-                print("INFO: Dati di test per domanda popolati con successo.")
-            else:
-                print("INFO: Tabella 'domanda' già popolata, salto il popolamento dei dati di test.")
-        except Exception as e:
-            session_pop_domanda.rollback()
-            print(f"ERRORE: Errore durante il popolamento di domanda: {e}")
-        finally:
-            session_pop_domanda.close()
             
-        # Popolamento di ruoli e funzionalità
-        populate_db()
+        # *** INIZIO SEZIONE POPOLAMENTO DATI RIMOSSA ***
+        # L'intera logica di popolamento per Ambito, Categoria, Driver e Domanda è stata rimossa
+        # per evitare conflitti con i dati preesistenti e risolvere l'IntegrityError.
+        # Anche la chiamata a populate_db() è stata rimossa per risolvere il NameError.
+        # *** FINE SEZIONE POPOLAMENTO DATI RIMOSSA ***
 
     except Exception as e:
         print(f"ERRORE: Errore durante l'avvio dell'applicazione: {e}")

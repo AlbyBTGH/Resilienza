@@ -44,16 +44,9 @@
                             <label class="form-label form-label-sm">Domande Selezionate:</label>
                             <ul class="list-group" id="domandeSelezionateContainer"></ul>
                         </div>
-
-                        <!-- ?? Pulsanti azione -->
-                        <div class="mt-3 d-flex gap-2">
-                            <button type="submit" class="btn btn-success btn-sm">
-                                <i class="fas fa-save me-2"></i>Salva Modifiche
-                            </button>
-                            <a href="/crea_questionario" class="btn btn-secondary btn-sm">
-                                <i class="fas fa-arrow-left me-1"></i>Indietro
-                            </a>
-                        </div>
+                        <button type="submit" class="btn btn-success btn-sm mt-2">
+                            <i class="fas fa-save me-2"></i>Salva Modifiche
+                        </button>
                     </form>
                 </div>
             </div>
@@ -111,6 +104,10 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     let domandeSelezionate = [];
     let allDomande = [];
+
+    function toggleLoading(isLoading) {
+        // Placeholder per un loader, opzionale
+    }
 
     function renderDomande() {
         domandeTableBody.innerHTML = '';
@@ -183,12 +180,17 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     async function loadData() {
+        toggleLoading(true);
         try {
             const [questionarioResponse, domandeResponse, driversResponse] = await Promise.all([
                 fetch(API_URL_QUESTIONARIO),
                 fetch(API_URL_DOMANDE),
                 fetch(API_URL_DRIVERS)
             ]);
+
+            if (!questionarioResponse.ok || !domandeResponse.ok || !driversResponse.ok) {
+                throw new Error("Errore nel caricamento dei dati da una delle API.");
+            }
 
             const questionarioData = await questionarioResponse.json();
             const domandeData = await domandeResponse.json();
@@ -211,15 +213,19 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         } catch (error) {
             console.error("? Errore nel caricamento dei dati:", error);
+        } finally {
+            toggleLoading(false);
         }
     }
 
     driverFilter.addEventListener('change', renderDomande);
 
+    // ? FIX: Aggiunto controllo CSRF + debug console
     questionarioForm.addEventListener('submit', async function(e) {
         e.preventDefault();
 
-        const csrfToken = document.getElementById('csrf_token')?.value || null;
+        const csrfTokenInput = document.getElementById('csrf_token');
+        const csrfToken = csrfTokenInput ? csrfTokenInput.value : null;
 
         const data = {
             descr: descrInput.value,
@@ -256,6 +262,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     loadData();
 });
 
+// Funzione per mostrare messaggi flash dinamici
 function showFlashMessage(message, category) {
     const container = document.getElementById('flash-messages-container');
     if (!container) return;
