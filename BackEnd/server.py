@@ -27,86 +27,85 @@ from flask_wtf.csrf import CSRFProtect
 from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import DataRequired, Email
 
-# Import modelli (Domain) e servizi
+from sqlalchemy import text
+from sqlalchemy.orm import joinedload
+
+# -------------------
+# DATABASE / ORM
+# -------------------
 from Classi.ClasseDB.db_connection import Base, engine, SessionLocal
-from Classi.Classe_menu_principale.Domain_t_menu_principale import TMenuPrincipale
+
+# -------------------
+# UTENTI / RUOLI / FUNZIONALITA
+# -------------------
+from Classi.ClasseUtenti.Classe_t_utenti.Domain_t_utenti import TUtenti
+from Classi.ClasseUtenti.Classe_t_ruolo.Domain_t_ruolo import TRuolo
 from Classi.ClasseUtenti.Classe_t_funzionalita.Domain_t_funzionalita import TFunzionalita
 from Classi.ClasseUtenti.Classe_t_funzionalitaUtenti.Domain_t_funzionalitaUtente import TFunzionalitaUtente
-from Classi.ClasseUtenti.Classe_t_ruolo.Domain_t_ruolo import TRuolo
-from Classi.ClasseUtenti.Classe_t_utenti.Domain_t_utenti import TUtenti # Modificato da TUtente a TUtenti
 
-# Import del Domain per Ambito
+# -------------------
+# MENU
+# -------------------
+from Classi.Classe_menu_principale.Domain_t_menu_principale import TMenuPrincipale
+
+# -------------------
+# AMBITO / CATEGORIA / DRIVER / DOMANDA
+# -------------------
 from Classi.ClasseAnagrafica.ClasseAmbito.Domain_t_ambito import TAmbito
-
-# Import del Domain per Categoria
 from Classi.ClasseAnagrafica.ClasseCategoria.Domain_t_categoria import TCategoria
-
-# Import del Domain per Driver
 from Classi.ClasseAnagrafica.ClasseDriver.Domain_t_driver import TDriver
-
-# Import del Domain per Domanda
 from Classi.ClasseAnagrafica.ClasseDomanda.Domain_t_domanda import TDomanda
 
-# GRUPPO_RISPOSTA ###
+# -------------------
+# GRUPPO RISPOSTA
+# -------------------
 from Classi.ClasseAnagrafica.ClasseGruppoRisposta.Domain_t_gruppo_risposta import TGruppoRisposta
 
-# Import del Domain per Caricamento Dati # AGGIUNTO
+# -------------------
+# CARICAMENTO DATI
+# -------------------
 from Classi.Classe_dati_caricamento.Domain_t_dati_caricamento import TDatiCaricamento
 
-# Importa il nuovo controller per la gestione dei progetti
-from Classi.ClasseAnagrafica.ClasseProgetto.Controller_t_progetto import t_progetto_controller
-
-# Importa il modello per la tabella PROGETTO
+# -------------------
+# PROGETTI / QUESTIONARI
+# -------------------
 from Classi.ClasseAnagrafica.ClasseProgetto.Domain_t_progetto import TProgetto
+from Classi.ClasseAnagrafica.ClasseStatoProgetto.Domain_t_stato_progetto import TStatoProgetto
+from Classi.ClasseAnagrafica.ClasseCliente.Domain_t_cliente import TCliente
+from Classi.ClasseProgettoQuestionario.Domain_progetto_questionario import ProgettoQuestionario
+from Classi.ClasseProgettoQuestionarioDomanda.Domain_progetto_questionario_domanda import ProgettoQuestionarioDomanda
+from Classi.ClasseQuestionario.Domain_t_questionario import TQuestionario
 
+# -------------------
+# CONTROLLER
+# -------------------
+from Classi.ClasseAnagrafica.ClasseAmbito.Controller_t_ambito import t_ambito_controller
+from Classi.ClasseAnagrafica.ClasseCategoria.Controller_t_categoria import t_categoria_controller
+from Classi.ClasseAnagrafica.ClasseDriver.Controller_t_driver import t_driver_controller
+from Classi.ClasseAnagrafica.ClasseDomanda.Controller_t_domanda import t_domanda_controller
+from Classi.ClasseAnagrafica.ClasseGruppoRisposta.Controller_t_gruppo_risposta import t_gruppo_risposta_controller
+from Classi.ClasseAnagrafica.ClasseProgetto.Controller_t_progetto import t_progetto_controller
+from Classi.ClasseAnagrafica.ClasseStatoProgetto.Controller_stati_progetto import t_stato_progetto_controller
+from Classi.ClasseQuestionario.Controller_t_questionario import t_questionario_controller
+from Classi.ClasseAnagrafica.ClasseRisposta.Controller_t_risposta import t_risposta_controller
+from Classi.ClasseAnagrafica.ClasseCliente.Controller_t_cliente import t_cliente_controller
 
+# -------------------
+# SERVICE / REPOSITORY
+# -------------------
 from Classi.Classe_menu_principale.Service_t_menu_principale import Service_t_menu_principale
 from Classi.ClasseUtenti.Classe_t_funzionalita.Service_t_funzionalita import Service_t_funzionalita
 from Classi.ClasseUtenti.Classe_t_funzionalitaUtenti.Service_t_funzionalitaUtente import Service_t_FunzionalitaUtente
 from Classi.ClasseUtenti.Classe_t_utenti.Repository_t_utenti import Repository_t_utenti
 from Classi.ClasseUtenti.Classe_t_ruolo.Repository_t_ruolo import Repository_t_ruolo
-# Import del Service e del Controller per Ambito
 from Classi.ClasseAnagrafica.ClasseAmbito.Service_t_ambito import Service_t_ambito
-from Classi.ClasseAnagrafica.ClasseAmbito.Controller_t_ambito import t_ambito_controller
-
-# Import del Service e del Controller per Categoria
 from Classi.ClasseAnagrafica.ClasseCategoria.Service_t_categoria import Service_t_categoria
-from Classi.ClasseAnagrafica.ClasseCategoria.Controller_t_categoria import t_categoria_controller
-
-# Import del Service e del Controller per Driver
 from Classi.ClasseAnagrafica.ClasseDriver.Service_t_driver import Service_t_driver
-from Classi.ClasseAnagrafica.ClasseDriver.Controller_t_driver import t_driver_controller
-
-# Import del Service e del Controller per Domanda
 from Classi.ClasseAnagrafica.ClasseDomanda.Service_t_domanda import Service_t_domanda
-from Classi.ClasseAnagrafica.ClasseDomanda.Controller_t_domanda import t_domanda_controller
-
-# GRUPPO_RISPOSTA ###
 from Classi.ClasseAnagrafica.ClasseGruppoRisposta.Service_t_gruppo_risposta import Service_t_gruppo_risposta
-from Classi.ClasseAnagrafica.ClasseGruppoRisposta.Controller_t_gruppo_risposta import t_gruppo_risposta_controller
-
-# Import del Service per Caricamento Dati
 from Classi.Classe_dati_caricamento.Service_t_dati_caricamento import ServiceTDatiCaricamento
-
-# gestione progetti
 from Classi.ClasseAnagrafica.ClasseProgetto.Service_t_progetto import Service_t_progetto
-from Classi.ClasseAnagrafica.ClasseAmbito.Controller_t_ambito import t_ambito_controller
-from Classi.ClasseAnagrafica.ClasseStatoProgetto.Controller_stati_progetto import t_stato_progetto_controller
-from Classi.ClasseQuestionario.Controller_t_questionario import t_questionario_controller
-from Classi.ClasseQuestionario.Domain_t_questionario import TQuestionario
-from sqlalchemy.orm import joinedload
-from Classi.ClasseAnagrafica.ClasseRisposta.Controller_t_risposta import t_risposta_controller
-from Classi.ClasseAnagrafica.ClasseRisposta.Service_t_risposta import Service_t_risposta
-
-# GESTIONE PROGETTI
-from Classi.ClasseAnagrafica.ClasseProgetto.Controller_t_progetto import t_progetto_controller
-from Classi.ClasseAnagrafica.ClasseProgetto.Domain_t_progetto import TProgetto
-from Classi.ClasseAnagrafica.ClasseCliente.Domain_t_cliente import TCliente # Necessario per TProgetto
-from Classi.ClasseAnagrafica.ClasseAmbito.Domain_t_ambito import TAmbito # Necessario per TProgetto
-from Classi.ClasseAnagrafica.ClasseStatoProgetto.Domain_t_stato_progetto import TStatoProgetto # Necessario per TProgetto
-
-#CLIENTI
-from Classi.ClasseAnagrafica.ClasseCliente.Controller_t_cliente import t_cliente_controller 
+from Classi.ClasseAnagrafica.ClasseRisposta.Service_t_risposta import Service_t_risposta 
 
 # Inizializzazione del logging
 logging.basicConfig(level=logging.INFO)
@@ -522,21 +521,6 @@ def progetti_page():
         csrf_token=csrf_token
     )
 
-"""
-@appBT.route("/crea_questionario", methods=['GET'])
-@login_required
-def crea_questionario():
-    # Il decoratore @login_required gestisce già l'autenticazione.
-    
-    # Crea un'istanza del servizio per poter chiamare il metodo corretto.
-    menu_service = Service_t_menu_principale()
-    menu = menu_service.get_menu_principale()
-
-    print(f"DEBUG: Contenuto del menu recuperato: {menu}")
-    
-    return render_template("crea_questionario.html", menu=menu, **{'csrf_token': session.get('csrf_token')})
-"""
-
 # ### route CREA QUESTIONARIO ###
 @appBT.route("/crea_questionario", methods=['GET'])
 @login_required
@@ -613,6 +597,37 @@ def gestione_questionario(questionario_id):
         questionario_id=questionario_id,
         questionario_descr=questionario_descr
     )
+
+
+# Rotta per visualizzare la pagina di associazione Progetto <-> Questionario
+@appBT.route("/associa_questionario_progetto")
+@login_required
+def associa_questionario_progetto_page():
+    current_user_role_id = session.get('user_role_id')
+    current_user_email = session.get('user_email')
+    current_username = session.get('username')
+    current_user_role_descr = session.get('user_role_descr')
+
+    dynamic_menu = []
+    if current_user_role_id is not None:
+        dynamic_menu = service_t_funzionalita_utente.build_menu_structure(role_id=current_user_role_id)
+    else:
+        print("DEBUG: Ruolo utente non definito in sessione per associa_questionario_progetto_page. Menu vuoto.")
+
+    from flask_wtf.csrf import generate_csrf
+    csrf_token = generate_csrf()
+
+    return render_template(
+        "associa_questionario_progetto.html",
+        title="Associa Questionario a Progetto",
+        menu_data=dynamic_menu,
+        current_user_email=current_user_email,
+        current_username=current_username,
+        current_user_role_descr=current_user_role_descr,
+        csrf_token=csrf_token
+    )
+
+
 
 # ### API GESTIONE QUESTIONARIO ###
 @appBT.route('/api/questionario/<int:questionario_id>', methods=['GET'])
@@ -748,6 +763,293 @@ def update_questionario(questionario_id):
     finally:
         session.close()
 
+# ============================================
+# API: Associa Questionario a Progetto (con domande collegate)
+# ============================================
+@appBT.route('/api/associa_questionario_progetto', methods=['POST'])
+@login_required
+def associa_questionario_progetto():
+    """
+    API per associare un questionario a un progetto e inserire automaticamente
+    anche le domande associate nella tabella progetto_questionario_domanda.
+    """
+    db_session = SessionLocal()
+    try:
+        data = request.json
+        if not data or 'id_progetto' not in data or 'id_questionario' not in data:
+            return jsonify({'error': 'Parametri mancanti: id_progetto e id_questionario sono obbligatori'}), 400
+
+        id_progetto = data['id_progetto']
+        id_questionario = data['id_questionario']
+
+        progetto = db_session.query(TProgetto).filter_by(id=id_progetto).one_or_none()
+        questionario = db_session.query(TQuestionario).filter_by(id=id_questionario).one_or_none()
+
+        if not progetto:
+            return jsonify({'error': f'Progetto con ID {id_progetto} non trovato'}), 404
+        if not questionario:
+            return jsonify({'error': f'Questionario con ID {id_questionario} non trovato'}), 404
+
+        # ⚙️ Controlla se l'associazione esiste già
+        existing_assoc = (
+            db_session.query(ProgettoQuestionario)
+            .filter_by(id_progetto=id_progetto, id_questionario=id_questionario)
+            .first()
+        )
+        if existing_assoc:
+            return jsonify({'message': 'Il questionario è già associato a questo progetto'}), 200
+
+        # ✅ Crea la nuova associazione principale
+        nuova_associazione = ProgettoQuestionario(
+            id_progetto=id_progetto,
+            id_questionario=id_questionario
+        )
+        db_session.add(nuova_associazione)
+        db_session.flush()  # serve per ottenere l’ID generato
+
+        # 🧩 Recupera tutte le domande associate al questionario scelto
+        query_domande = text("""
+            SELECT dq.ID_DOMANDA, d.ID_GRUPPO_RISPOSTA
+            FROM domande_questionario dq
+            JOIN domande d ON dq.ID_DOMANDA = d.ID
+            WHERE dq.ID_QUESTIONARIO = :idq
+        """)
+        domande = db_session.execute(query_domande, {'idq': id_questionario}).fetchall()        
+
+        if not domande:
+            db_session.rollback()
+            return jsonify({'error': 'Nessuna domanda associata a questo questionario'}), 400
+
+        # 🧱 Inserisce tutte le righe nella tabella progetto_questionario_domanda
+        for id_domanda, id_gruppo_risposta in domande:
+            if id_gruppo_risposta is not None:
+                # Se il gruppo risposta è specificato, lo includiamo
+                db_session.execute(
+                    text("""
+                        INSERT INTO progetto_questionario_domanda
+                        (ID_PROGETTO_QUESTIONARIO, ID_DOMANDA, ID_GRUPPO_RISPOSTA)
+                        VALUES (:id_pq, :id_domanda, :id_gr)
+                    """),
+                    {
+                        'id_pq': nuova_associazione.id,
+                        'id_domanda': id_domanda,
+                        'id_gr': id_gruppo_risposta
+                    }
+                )
+            else:
+                # Se non c’è ancora un gruppo risposta, inseriamo solo progetto+domanda
+                db_session.execute(
+                    text("""
+                        INSERT INTO progetto_questionario_domanda
+                        (ID_PROGETTO_QUESTIONARIO, ID_DOMANDA)
+                        VALUES (:id_pq, :id_domanda)
+                    """),
+                    {
+                        'id_pq': nuova_associazione.id,
+                        'id_domanda': id_domanda
+                    }
+                )
+
+        db_session.commit()
+
+        return jsonify({
+            'message': 'Associazione creata con successo',
+            'id_progetto': id_progetto,
+            'id_questionario': id_questionario,
+            'numero_domande_collegate': len(domande)
+        }), 201
+
+    except Exception as e:
+        db_session.rollback()
+        print(f"ERRORE: associa_questionario_progetto -> {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db_session.close()
+
+
+# ============================================
+# API: Leggi tutte le associazioni progetto-questionario
+# ============================================
+@appBT.route('/api/associa_questionario_progetto', methods=['GET'])
+@login_required
+def get_associazioni_progetto_questionario():
+    db_session = SessionLocal()
+    try:
+        associazioni = db_session.query(ProgettoQuestionario).all()
+        result = []
+        for a in associazioni:
+            result.append({
+                'ID': a.id,  # <-- usa 'id' invece di 'ID'
+                'ID_PROGETTO': a.id_progetto,
+                'descr_progetto': a.progetto.descr if a.progetto else '—',
+                'ID_QUESTIONARIO': a.id_questionario,
+                'descr_questionario': a.questionario.descr if a.questionario else '—'
+            })
+        return jsonify(result), 200
+    except Exception as e:
+        print(f"ERRORE: get_associazioni_progetto_questionario -> {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db_session.close()
+
+# ============================================
+# API: Rimuovi associazione progetto-questionario
+# ============================================
+@appBT.route('/api/associa_questionario_progetto', methods=['DELETE'])
+@login_required
+def delete_associazione_progetto_questionario():
+    db_session = SessionLocal()
+    try:
+        data = request.json
+        if not data or 'id_progetto' not in data or 'id_questionario' not in data:
+            return jsonify({'error': 'Parametri mancanti: id_progetto e id_questionario sono obbligatori'}), 400
+
+        id_progetto = data['id_progetto']
+        id_questionario = data['id_questionario']
+
+        associazione = db_session.query(ProgettoQuestionario).filter_by(
+            id_progetto=id_progetto,
+            id_questionario=id_questionario
+        ).one_or_none()
+
+        if not associazione:
+            return jsonify({'error': 'Associazione non trovata'}), 404
+
+        db_session.delete(associazione)
+        db_session.commit()
+        return jsonify({'message': 'Associazione rimossa con successo'}), 200
+
+    except Exception as e:
+        db_session.rollback()
+        print(f"ERRORE: delete_associazione_progetto_questionario -> {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db_session.close()
+
+# API per ottenere le domande associate a una specifica associazione progetto-questionario
+@appBT.route('/api/progetto_questionario_domande/<int:id_progetto>/<int:id_questionario>', methods=['GET'])
+@login_required
+def get_domande_associazione(id_progetto, id_questionario):
+    db_session = SessionLocal()
+    try:
+        # Recupera l'associazione progetto-questionario
+        associazione = (
+            db_session.query(ProgettoQuestionario)
+            .filter_by(id_progetto=id_progetto, id_questionario=id_questionario)
+            .one_or_none()
+        )
+        if not associazione:
+            return jsonify({'error': 'Associazione non trovata'}), 404
+
+        # Recupera tutte le domande associate
+        domande = (
+            db_session.query(TDomanda)
+            .join(ProgettoQuestionarioDomanda, ProgettoQuestionarioDomanda.id_domanda == TDomanda.id)
+            .filter(ProgettoQuestionarioDomanda.id_progetto_questionario == associazione.id)
+            .all()
+        )
+
+        # 🔹 Recupera tutti i gruppi risposta (da mostrare nelle tendine)
+        gruppi_risposta = db_session.query(TGruppoRisposta).all()
+        gruppi_disponibili = [{'id': g.id, 'descr': g.descr} for g in gruppi_risposta]
+
+        # 🔹 Crea l’elenco finale di domande + gruppo risposta attuale
+        domande_list = []
+        for d in domande:
+            pq_domanda = (
+                db_session.query(ProgettoQuestionarioDomanda)
+                .filter_by(id_progetto_questionario=associazione.id, id_domanda=d.id)
+                .one_or_none()
+            )
+
+            domande_list.append({
+                'id_domanda': d.id,
+                'descr_domanda': d.descr,
+                'id_gruppo_risposta': pq_domanda.id_gruppo_risposta if pq_domanda else None,
+                'gruppi_disponibili': gruppi_disponibili
+            })
+
+        return jsonify(domande_list), 200
+
+    except Exception as e:
+        db_session.rollback()
+        print(f"ERRORE: get_domande_associazione -> {e}")
+        return jsonify({'error': str(e)}), 500
+
+    finally:
+        db_session.close()
+
+
+# ============================================
+# API: Associa / Aggiorna Gruppo Risposta per una domanda in un progetto-questionario
+# ============================================
+@appBT.route('/api/associa_gruppo_risposta_domanda', methods=['PUT'])
+@login_required
+def associa_gruppo_risposta_domanda():
+    """
+    Aggiorna l'id_gruppo_risposta per una specifica domanda
+    associata a un progetto-questionario.
+    Parametri JSON:
+        - ID_PROGETTO_QUESTIONARIO: ID dell'associazione Progetto-Questionario
+        - ID_DOMANDA: ID della domanda
+        - ID_GRUPPO_RISPOSTA: ID del gruppo risposta da associare
+    """
+    db_session = SessionLocal()
+    try:
+        data = request.json
+        print("DEBUG API - dati ricevuti:", data)  # 🔹 debug input
+
+        if not data:
+            return jsonify({'error': 'Dati JSON mancanti'}), 400
+
+        # Recupero valori dal JSON
+        id_pq = data.get('ID_PROGETTO_QUESTIONARIO')
+        id_domanda = data.get('ID_DOMANDA')
+        id_gruppo_risposta = data.get('ID_GRUPPO_RISPOSTA')
+
+        print(f"DEBUG API - id_progetto_questionario: {id_pq}, id_domanda: {id_domanda}, id_gruppo_risposta: {id_gruppo_risposta}")
+
+        if not id_pq or not id_domanda:
+            return jsonify({'error': 'Parametri mancanti: ID_PROGETTO_QUESTIONARIO e ID_DOMANDA sono obbligatori'}), 400
+
+        # 🔹 Converti in interi
+        try:
+            id_pq = int(id_pq)
+            id_domanda = int(id_domanda)
+            id_gruppo_risposta = int(id_gruppo_risposta) if id_gruppo_risposta else None
+        except ValueError:
+            return jsonify({'error': 'I parametri devono essere numerici'}), 400
+
+        # 🔹 Usa gli attributi del modello, non i nomi colonne DB
+        associazione = db_session.query(ProgettoQuestionarioDomanda).filter_by(
+            id_progetto_questionario=id_pq,
+            id_domanda=id_domanda
+        ).one_or_none()
+
+        if not associazione:
+            return jsonify({'error': 'Associazione domanda-progetto-questionario non trovata'}), 404
+
+        # Aggiorna il gruppo risposta
+        associazione.id_gruppo_risposta = id_gruppo_risposta
+        db_session.commit()
+
+        print(f"DEBUG API - aggiornamento avvenuto: id_gruppo_risposta={associazione.id_gruppo_risposta}")
+
+        return jsonify({
+            'message': 'Gruppo risposta aggiornato con successo',
+            'ID_PROGETTO_QUESTIONARIO': id_pq,
+            'ID_DOMANDA': id_domanda,
+            'ID_GRUPPO_RISPOSTA': id_gruppo_risposta
+        }), 200
+
+    except Exception as e:
+        db_session.rollback()
+        print(f"ERRORE: associa_gruppo_risposta_domanda -> {e}")
+        return jsonify({'error': str(e)}), 500
+
+    finally:
+        db_session.close()
+
 
 @appBT.route('/api/drivers/', methods=['GET'])
 @login_required
@@ -794,8 +1096,6 @@ def gestione_risposte():
         current_user_role_descr=current_user_role_descr,
         csrf_token=csrf_token # E qui lo passi come variabile
     )
-
-
 
 
 
