@@ -106,6 +106,10 @@ from Classi.ClasseAnagrafica.ClasseGruppoRisposta.Service_t_gruppo_risposta impo
 from Classi.Classe_dati_caricamento.Service_t_dati_caricamento import ServiceTDatiCaricamento
 from Classi.ClasseAnagrafica.ClasseProgetto.Service_t_progetto import Service_t_progetto
 from Classi.ClasseAnagrafica.ClasseRisposta.Service_t_risposta import Service_t_risposta 
+from Classi.ClasseProgettoQuestionario.Service_progetto_questionario import ServiceProgettoQuestionario
+
+from Classi.ClasseRisposteCliente.Service_risposta_cliente import ServiceRispostaCliente
+from Classi.ClasseRisposteCliente.Controller_risposta_cliente import risposta_cliente_controller
 
 # Inizializzazione del logging
 logging.basicConfig(level=logging.INFO)
@@ -125,17 +129,20 @@ service_t_ambito = Service_t_ambito()
 service_t_categoria = Service_t_categoria()
 service_t_driver = Service_t_driver() # Istanza del servizio Driver
 service_t_domanda = Service_t_domanda() # Istanza del servizio Domanda
-# ### INIZIO AGGIUNTA PER GRUPPO_RISPOSTA ###
 service_t_gruppo_risposta = Service_t_gruppo_risposta()
-# ### FINE AGGIUNTA PER GRUPPO_RISPOSTA ###
 
 service_t_dati_caricamento = ServiceTDatiCaricamento() # AGGIUNTO
 
-# AGGIUNTA: Istanzia il servizio per la gestione dei progetti
+# Istanzia il servizio per la gestione dei progetti
 service_t_progetto = Service_t_progetto()
+
+service_progetto_questionario = ServiceProgettoQuestionario()
 
 service_t_risposta = Service_t_risposta()
 service_t_risposta.create_table_if_not_exists()
+
+service_risposta_cliente = ServiceRispostaCliente()
+
 
 # Definisci la classe del form di login
 class LoginFormNoCSRF(FlaskForm):
@@ -1065,6 +1072,168 @@ def get_drivers():
         db_session.close()
 
 
+# ============================================
+# API: Report Progetti Questionari
+# ============================================
+@appBT.route('/api/report_pq', methods=['GET'])
+@login_required
+def get_report_associazioni():
+    db_session = SessionLocal()
+    
+    # Leggi il parametro id_cliente dalla query string
+    id_cliente_filter = request.args.get('id_cliente', type=int)
+    
+    try:
+        # Inizializza la query principale
+        query = db_session.query(ProgettoQuestionario)
+        
+        # Carica tutte le relazioni necessarie con joinedload
+        query = query.options(
+            joinedload(ProgettoQuestionario.progetto).joinedload(TProgetto.cliente), 
+            joinedload(ProgettoQuestionario.questionario)
+        )
+        
+        # ✅ GESTIONE FILTRO
+        if id_cliente_filter and id_cliente_filter != 0:
+            # Se il filtro è attivo, è necessario un JOIN esplicito 
+            # per applicare la condizione sulla tabella TProgetto
+            query = query.join(ProgettoQuestionario.progetto).filter(TProgetto.id_cliente == id_cliente_filter)
+
+        # Esegui la query
+        report_results = query.all()
+        
+        report_data = []
+        for a in report_results:
+            progetto = a.progetto
+            questionario = a.questionario
+            
+            # Protezione da dati orfani (caso in cui la relazione è NULL)
+            if not progetto or not questionario:
+                continue
+
+            # Il cliente è caricato tramite joinedload da TProgetto
+            cliente = progetto.cliente
+            if not cliente:
+                # Caso estremo di TProgetto senza TCliente associato
+                cliente_descr = "N/D"
+                cliente_id = None
+            else:
+                cliente_descr = cliente.ragione_sociale
+                cliente_id = cliente.id
+
+            report_data.append({
+                'ID_Associazione': a.id,
+                'ID_Progetto': progetto.id,
+                'ID_Cliente': cliente_id,
+                'ID_Questionario': questionario.id,
+                
+                'descr_Progetto': progetto.descr,
+                'descr_Cliente': cliente_descr,
+                'descr_Questionario': questionario.descr,
+            })
+            
+        return jsonify(report_data), 200
+    except Exception as e:
+        print(f"ERRORE: get_report_associazioni -> {e}")
+        return jsonify({'error': f"Errore nel caricamento del report: {str(e)}"}), 500
+    finally:
+        db_session.close()
+
+# ============================================
+# API: Elenco Clienti (per filtro report)
+# ============================================
+@appBT.route('/api/report_pq_filtro1', methods=['GET']) 
+@login_required
+def report_pq_filtro1():
+    db_session = SessionLocal()
+    try:
+        # TCliente è la classe di Domain del cliente
+        clienti = db_session.query(TCliente).order_by(TCliente.ragione_sociale).all()
+        
+        clienti_list = [{
+            'id': c.id, 
+            'ragione_sociale': c.ragione_sociale
+        } for c in clienti]
+            
+        return jsonify(clienti_list), 200
+    except Exception as e:
+        print(f"ERRORE: report_pq_filtro1 -> {e}")
+        return jsonify({'error': 'Errore nel recupero dell\'elenco clienti per il report.'}), 500
+    finally:
+        db_session.close()
+
+
+
+
+# ============================================
+# API: Dettaglio Report Progetto Questionario (Nuova)
+# ============================================
+@appBT.route('/api/dettaglio_report/<int:id_progetto_questionario>', methods=['GET'])
+@login_required
+def get_dettaglio_report(id_progetto_questionario):
+    """
+    API che recupera i dettagli strutturati (Domande con Risposte Possibili) 
+    per un'associazione Progetto-Questionario.
+    """
+    try:
+        # FIX 1: RECUPERA L'UTENTE DALLA SESSIONE
+        # Assumendo che 'get_username_from_session' sia disponibile
+        nome_utente_autore = get_username_from_session() 
+        
+        # Chiama il Service, che a sua volta chiama il Repository
+        # FIX 2: PASSA IL NOME UTENTE AL SERVICE
+        report_data = service_progetto_questionario.get_dettaglio_report(
+            id_progetto_questionario=id_progetto_questionario,
+            nome_utente_autore=nome_utente_autore # <--- ARGOMENTO AGGIUNTO
+        )
+        
+        if not report_data:
+            return jsonify({'message': 'Nessuna domanda/risposta trovata per questa associazione.'}), 200
+            
+        return jsonify(report_data), 200
+        
+    except Exception as e:
+        # Questo print genera l'output ERRORE che vedi nel log
+        print(f"ERRORE: get_dettaglio_report -> {e}") 
+        return jsonify({'error': f"Errore nel caricamento del report di dettaglio: {str(e)}"}), 500
+
+# ============================================
+# Rotta Pagina: Dettaglio Report Progetto-Questionario (Nuova)
+# ============================================
+@appBT.route("/report/dettaglio_questionario/<int:id_progetto_questionario>", methods=['GET'])
+@login_required
+def dettaglio_questionario_page(id_progetto_questionario):
+    """
+    Renderizza la pagina per visualizzare il report di dettaglio.
+    """
+    # Logica standard per il menu dinamico e CSRF token
+    current_user_role_id = session.get('user_role_id')
+    current_user_email = session.get('user_email')
+    current_username = session.get('username')
+    current_user_role_descr = session.get('user_role_descr')
+
+    dynamic_menu = []
+    if current_user_role_id is not None:
+        dynamic_menu = service_t_funzionalita_utente.build_menu_structure(role_id=current_user_role_id)
+
+    from flask_wtf.csrf import generate_csrf
+    csrf_token = generate_csrf()
+    
+    # Passa l'ID al template affinché il frontend possa chiamare l'API sopra definita
+    return render_template(
+        "dettaglio_questionario_report.html", # Dovrai creare questo template
+        title=f"Dettaglio Report Questionario ID: {id_progetto_questionario}",
+        menu_data=dynamic_menu,
+        current_user_email=current_user_email,
+        current_username=current_username,
+        current_user_role_descr=current_user_role_descr,
+        csrf_token=csrf_token,
+        id_progetto_questionario=id_progetto_questionario
+    )
+
+
+
+
 @appBT.route("/gestione_risposte")
 @login_required
 def gestione_risposte():
@@ -1132,6 +1301,41 @@ def gestione_domande_gruppo():
         current_username=current_username,
         current_user_role_descr=current_user_role_descr,
         csrf_token=csrf_token  # Passa il token al template
+    )
+
+
+# Rotta per visualizzare la pagina del report Progetto-Questionario
+@appBT.route("/report_progetti_questionari")
+@login_required
+def report_progetti_questionari_page():
+    # ----------------------------------------------------
+    # QUESTA È LA PARTE CHE DEVE ESSERE INSERITA (L'INIZIALIZZAZIONE)
+    # ----------------------------------------------------
+    current_user_role_id = session.get('user_role_id')
+    current_user_email = session.get('user_email')
+    current_username = session.get('username')
+    current_user_role_descr = session.get('user_role_descr')
+
+    dynamic_menu = []
+    # Assumo che 'service_t_funzionalita_utente' sia già importato e disponibile
+    if current_user_role_id is not None:
+        dynamic_menu = service_t_funzionalita_utente.build_menu_structure(role_id=current_user_role_id)
+    else:
+        # Questo messaggio è utile per il debug
+        print("DEBUG: Ruolo utente non definito in sessione per report_progetti_questionari_page. Menu vuoto.")
+
+    from flask_wtf.csrf import generate_csrf
+    csrf_token = generate_csrf()
+    # ----------------------------------------------------
+    
+    return render_template(
+        "report_progetti_questionari.html", # Nuovo template
+        title="Report Progetti/Questionari",
+        menu_data=dynamic_menu,
+        current_user_email=current_user_email,
+        current_username=current_username,
+        current_user_role_descr=current_user_role_descr,
+        csrf_token=csrf_token # Importante per la sicurezza
     )
 
 
@@ -1231,6 +1435,9 @@ if __name__ == '__main__':
     from Classi.ClasseAnagrafica.ClasseGruppoRisposta.Controller_t_gruppo_risposta import t_gruppo_risposta_controller
     app.register_blueprint(t_gruppo_risposta_controller, url_prefix='/api/gruppo-risposta')
 
+    from Classi.ClasseRisposteCliente.Controller_risposta_cliente import risposta_cliente_controller
+    from Classi.ClasseRisposteCliente.Controller_risposta_cliente import get_username_from_session
+
     # Registra il blueprint per la gestione dei progetti
     app.register_blueprint(t_progetto_controller, url_prefix='/api/progetto')
 
@@ -1244,6 +1451,11 @@ if __name__ == '__main__':
     # app.register_blueprint(t_progetto_controller, url_prefix='/api/progetti')
 
     app.register_blueprint(t_cliente_controller, url_prefix='/api/clienti')
+
+
+    print("DEBUG: Registrando risposta_cliente_controller con prefisso /api/risposta_cliente")
+    # Il prefisso /api/risposta_cliente è corretto, dato che la rotta nel Controller è /salva_risposte_massive
+    app.register_blueprint(risposta_cliente_controller)
     
     print("DEBUG: Registrando la rotta di upload 'upload_domande' con prefisso /api/domande/upload")
     app.add_url_rule('/api/domande/upload', 'upload_domande', upload_domande, methods=['POST'])

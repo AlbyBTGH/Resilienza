@@ -1,0 +1,345 @@
+{% extends "index.html" %}
+
+{% block title %}Dettaglio Report Questionario{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-sm h-100 p-3">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Dettaglio Report Questionario ID: {{ id_progetto_questionario }}</h5>
+            </div>
+            <div class="card-body p-0">
+                
+                <div id="messageContainer" class="p-3">
+                    </div>
+                
+                <div id="reportContainer">
+                    <div class="text-center text-muted p-5" id="loadingMessage">
+                        <div class="spinner-border text-primary me-2" role="status"></div>Caricamento dati di dettaglio...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row mt-3">
+    <div class="col-12 text-end">
+        <button id="salvaButton" class="btn btn-success me-2" style="display: none;">
+            <i class="bi bi-save"></i> Salva Risposte
+        </button>
+        <a href="{{ url_for('appBT.report_progetti_questionari_page') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Torna alla Lista
+        </a>
+    </div>
+</div>
+{% endblock %} 
+
+{% block scripts %}
+<script>
+// Variabile globale per tracciare le risposte selezionate
+let risposteSelezionate = {};
+
+document.addEventListener('DOMContentLoaded', function() {
+    const idProgettoQuestionario = "{{ id_progetto_questionario }}";
+    
+    const salvaButton = document.getElementById('salvaButton');
+
+    if (salvaButton) {
+        salvaButton.addEventListener('click', function() {
+            salvaRisposteMassive(idProgettoQuestionario);
+        });
+    } else {
+        console.error("Elemento 'salvaButton' non trovato nel DOM.");
+    }
+
+    fetchDettaglioReport(idProgettoQuestionario);
+});
+
+
+// ======================================================================
+// 0. FUNZIONE DI UTILITY PER MESSAGGI (Sostituisce alert())
+// ======================================================================
+
+/**
+ * Mostra un messaggio di notifica (successo/errore) in pagina con fade out automatico.
+ */
+function displayMessage(message, type = 'success', duration = 5000) {
+    const container = document.getElementById('messageContainer');
+    if (!container) return; 
+
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+    
+    // Rimuove qualsiasi messaggio precedente
+    container.innerHTML = ''; 
+
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert ${alertClass} alert-dismissible fade show`;
+    alertDiv.setAttribute('role', 'alert');
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    
+    container.appendChild(alertDiv);
+
+    // Rimuovi il messaggio dopo 'duration' millisecondi
+    setTimeout(() => {
+        if (alertDiv) {
+            alertDiv.classList.remove('show');
+            setTimeout(() => alertDiv.remove(), 150); 
+        }
+    }, duration); 
+}
+
+// ======================================================================
+// 1. GESTIONE CARICAMENTO DATI
+// ======================================================================
+/**
+ * Funzione per recuperare i dati del report tramite API e renderizzare il contenuto.
+ */
+function fetchDettaglioReport(id) {
+    const reportContainer = document.getElementById('reportContainer');
+    const loadingMessage = document.getElementById('loadingMessage');
+    const salvaButton = document.getElementById('salvaButton'); 
+
+    // Setup Iniziale della UI con controlli di esistenza
+    if (loadingMessage) {
+        loadingMessage.style.display = 'block';
+    }
+    
+    if (salvaButton) {
+        salvaButton.style.display = 'none'; 
+    }
+    
+    reportContainer.innerHTML = ''; 
+
+    const url = `/api/dettaglio_report/${id}`;
+
+    // Chiamata API
+    fetch(url)
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(errorData => {
+                    const errorMessage = errorData.error || `Errore HTTP: ${response.status}`;
+                    throw new Error(errorMessage);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            risposteSelezionate = {}; 
+            
+            if (loadingMessage) { 
+                loadingMessage.style.display = 'none'; 
+            }
+
+            if (data && data.length > 0) {
+                if (salvaButton) { 
+                    salvaButton.style.display = 'inline-block';
+                }
+                renderReport(data); 
+            } else {
+                reportContainer.innerHTML = '<div class="alert alert-info p-5 text-center">Nessuna domanda associata a questo questionario o dati non disponibili.</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Errore nel recupero del report:', error);
+            
+            if (loadingMessage) { 
+                loadingMessage.style.display = 'none'; 
+            }
+            
+            if (salvaButton) { 
+                salvaButton.style.display = 'none'; 
+            }
+            
+            reportContainer.innerHTML = `<div class="alert alert-danger p-5 text-center">
+                **Errore nel caricamento dei dati:** ${error.message}. Per favore, riprova.
+            </div>`;
+        });
+}
+
+
+// ======================================================================
+// 2. RENDERING DEI DATI
+// ======================================================================
+
+/**
+ * Gestisce il cambio di selezione di un radio button, aggiornando la variabile globale.
+ */
+function handleRispostaChange(radioElement) {
+    const idAssociazione = parseInt(radioElement.getAttribute('data-id-associazione'));
+    const idRisposta = parseInt(radioElement.value);
+
+    // Aggiorna lo stato della risposta
+    risposteSelezionate[idAssociazione] = idRisposta;
+
+    console.log(`Risposta selezionata: Associazione ID ${idAssociazione}, Risposta ID ${idRisposta}`);
+}
+
+/**
+ * Funzione di rendering per costruire l'accordion delle domande.
+ */
+function renderReport(data) {
+    const container = document.getElementById('reportContainer');
+    container.innerHTML = ''; 
+
+    const accordion = document.createElement('div');
+    accordion.className = 'accordion';
+    accordion.id = 'domandeAccordion';
+
+    data.forEach((domanda, index) => {
+        const idAssociazione = domanda.id_associazione; 
+        const accordionId = `collapse_${idAssociazione}`;
+        const headerId = `heading_${idAssociazione}`;
+        const isCollapsed = index === 0 ? '' : 'collapsed'; 
+        const isShowing = index === 0 ? 'show' : '';
+
+        const rispostaSalvataId = domanda.risposta_salvata_id; 
+        
+        if (rispostaSalvataId) {
+             risposteSelezionate[idAssociazione] = rispostaSalvataId;
+        }
+
+        const item = document.createElement('div');
+        item.className = 'accordion-item';
+
+        item.innerHTML = `
+            <h2 class="accordion-header" id="${headerId}">
+                <button class="accordion-button ${isCollapsed} fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#${accordionId}" aria-expanded="${index === 0 ? 'true' : 'false'}" aria-controls="${accordionId}">
+                    Domanda #${index + 1}: ${domanda.testo} 
+                    ${rispostaSalvataId ? '<span class="badge bg-success ms-3">Risposta Salvata</span>' : '<span class="badge bg-warning ms-3">Non Risposta</span>'}
+                </button>
+            </h2>
+            <div id="${accordionId}" class="accordion-collapse collapse ${isShowing}" aria-labelledby="${headerId}" data-bs-parent="#domandeAccordion">
+                <div class="accordion-body">
+                    <h6 class="text-primary mb-3">Seleziona la risposta:</h6>
+                </div>
+            </div>
+        `;
+        
+        const body = item.querySelector('.accordion-body');
+        const risposte = domanda.risposte_possibili;
+
+        if (risposte && risposte.length > 0) {
+            const ul = document.createElement('ul');
+            ul.className = 'list-group list-group-flush';
+
+            risposte.forEach(risposta => {
+                const radioGroupName = `risposta_domanda_${idAssociazione}`;
+                const isChecked = risposta.id === rispostaSalvataId ? 'checked' : ''; 
+
+                const li = document.createElement('li');
+                li.className = 'list-group-item';
+                
+                const radioHtml = `
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" 
+                               name="${radioGroupName}" 
+                               id="risposta_${idAssociazione}_${risposta.id}" 
+                               value="${risposta.id}" 
+                               data-peso="${risposta.peso}"
+                               data-id-associazione="${idAssociazione}" 
+                               ${isChecked} 
+                               onchange="handleRispostaChange(this)">
+                        <label class="form-check-label fw-medium" for="risposta_${idAssociazione}_${risposta.id}">
+                            ${risposta.descr} 
+                            ${risposta.peso !== null ? `(Peso: ${risposta.peso})` : ''}
+                        </label>
+                    </div>
+                `;
+                li.innerHTML = radioHtml;
+                ul.appendChild(li);
+            });
+            
+            body.appendChild(ul);
+        } else {
+            body.innerHTML += '<div class="alert alert-warning mb-0">Nessuna risposta possibile definita per questa domanda.</div>';
+        }
+
+        accordion.appendChild(item);
+    });
+
+    container.appendChild(accordion);
+}
+
+
+// ======================================================================
+// 3. GESTIONE INTERAZIONE UTENTE E SALVATAGGIO
+// ======================================================================
+
+/**
+ * Prepara e invia i dati per il salvataggio massivo.
+ */
+function salvaRisposteMassive(idProgettoQuestionario) {
+    const salvaButton = document.getElementById('salvaButton');
+    const risposteDaSalvare = [];
+
+    for (const idAssociazione in risposteSelezionate) {
+        risposteDaSalvare.push({
+            id_progetto_questionario_domanda: parseInt(idAssociazione),
+            id_risposta: parseInt(risposteSelezionate[idAssociazione])
+        });
+    }
+
+    if (risposteDaSalvare.length === 0) {
+        displayMessage("Nessuna risposta selezionata da salvare.", 'danger');
+        return;
+    }
+
+    // Disabilita il pulsante
+    if (salvaButton) { 
+        salvaButton.disabled = true;
+        salvaButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Salvataggio...';
+    }
+
+    fetch('/api/risposta_cliente/salva_risposte_massive', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            // Correzione e gestione del caso in cui csrf_token non sia disponibile
+            'X-CSRFToken': '{{ csrf_token if csrf_token else "" }}' 
+        },
+        body: JSON.stringify(risposteDaSalvare)
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(errorData => {
+                throw new Error(errorData.error || `Errore HTTP: ${response.status}`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        // Riabilita il pulsante
+        if (salvaButton) {
+            salvaButton.disabled = false;
+            salvaButton.innerHTML = '<i class="bi bi-save"></i> Salva Risposte';
+        }
+
+        if (data.success) {
+            // ⭐ SUCCESS: Usa displayMessage
+            displayMessage(`Salvataggio di ${risposteDaSalvare.length} risposte completato con successo! 🎉`, 'success');
+            
+            // Ricarica i dati per vedere lo stato aggiornato
+            fetchDettaglioReport(idProgettoQuestionario); 
+        } else {
+            // ⭐ ERRORE API: Usa displayMessage
+            displayMessage('ERRORE: ' + (data.error || 'Si è verificato un errore nel salvataggio.'), 'danger');
+            console.error('Errore API:', data.error);
+        }
+    })
+    .catch(error => {
+        // Gestione errore di rete/API
+        if (salvaButton) {
+            salvaButton.disabled = false;
+            salvaButton.innerHTML = '<i class="bi bi-save"></i> Salva Risposte';
+        }
+        // ⭐ ERRORE CATCH: Usa displayMessage
+        displayMessage('ERRORE CRITICO: Impossibile comunicare con il server per il salvataggio: ' + error.message, 'danger');
+        console.error('Errore di salvataggio:', error);
+    });
+}
+</script>
+{% endblock %}
