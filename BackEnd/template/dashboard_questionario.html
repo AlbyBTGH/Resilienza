@@ -1,0 +1,184 @@
+{% extends "index.html" %}
+
+{% block title %}Dashboard Report Questionario{% endblock %}
+
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-sm h-100 p-3">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Dashboard Punteggi Questionario ID: {{ id_progetto_questionario }}</h5>
+            </div>
+            <div class="card-body p-4">
+                
+
+                <div class="row mt-4 mb-4">
+                    
+                    <div class="col-md-6">
+                        <div class="card shadow-sm p-3">
+                            <canvas id="radarChart" style="height: 450px;"></canvas>
+                            
+                            <div id="noChartDataMessage" class="alert alert-info text-center mt-3" style="display: none;">
+                                Il punteggio non è ancora stato calcolato. Completa il questionario e clicca "Concludi Questionario" per generare i dati.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="card shadow-sm p-3 h-100">
+                             <h5 class="text-center text-muted">Secondo Radar / Dati Aggiuntivi (Spazio Riservato)</h5>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mt-5">
+                    <div class="col-12 text-end">
+                         <a href="{{ url_for('appBT.dettaglio_questionario_page', id_progetto_questionario=id_progetto_questionario) }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Torna al Questionario
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+// ======================================================================
+// 1. FUNZIONE PRINCIPALE: FETCH E DRAW GRAFICO RADAR
+// ======================================================================
+document.addEventListener('DOMContentLoaded', function() {
+    const idProgettoQuestionario = "{{ id_progetto_questionario }}";
+    fetchAndDrawRadarChart(idProgettoQuestionario);
+});
+
+/**
+ * Funzione per recuperare i dati e disegnare il grafico radar.
+ */
+function fetchAndDrawRadarChart(id) {
+    const url = `/api/punteggio/grafico_radar/${id}`;
+    const chartContainer = document.getElementById('radarChart');
+    const noDataMsg = document.getElementById('noChartDataMessage');
+
+    if (!chartContainer) return;
+
+    // Rimuovi eventuali grafici precedenti
+    if (window.myRadarChart) {
+        window.myRadarChart.destroy();
+    }
+    
+    // Setup iniziale
+    chartContainer.style.display = 'none';
+    noDataMsg.style.display = 'none';
+    noDataMsg.className = 'alert alert-info text-center mt-3'; 
+
+    fetch(url)
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(errorData => {
+                    if (response.status === 404 || errorData.data === undefined) {
+                        return { success: true, data: [] }; // Tratta come nessun dato
+                    }
+                    throw new Error(errorData.error || `Errore HTTP: ${response.status}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success && data.data) {
+                
+                // Richiede un minimo di 3 categorie (controllo corretto)
+                if (data.data.length >= 3) {
+                    // ✅ Caso A: 3 o più categorie (OK)
+                    chartContainer.style.display = 'block';
+                    drawRadarChart(data.data);
+                    
+                } else if (data.data.length > 0) {
+                    // ⚠️ Caso B/C: 1 o 2 categorie
+                    noDataMsg.className = 'alert alert-warning text-center mt-3';
+                    noDataMsg.innerHTML = '⚠️ **Attenzione:** Il grafico radar richiede **almeno tre categorie** per visualizzare una ragnatela completa. Ne sono state trovate solo ' + data.data.length + '.';
+                    noDataMsg.style.display = 'block';
+                } else {
+                    // Dati vuoti (0 categorie)
+                    noDataMsg.innerHTML = 'Il punteggio non è ancora stato calcolato. Completa il questionario e clicca "Concludi Questionario" per generare i dati.';
+                    noDataMsg.style.display = 'block';
+                }
+                
+            } else {
+                // Dati vuoti o calcolo non eseguito (risposta da 200 con data vuota/null)
+                noDataMsg.innerHTML = 'Il punteggio non è ancora stato calcolato. Completa il questionario e clicca "Concludi Questionario" per generare i dati.';
+                noDataMsg.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            console.error("Errore nel recupero dati grafico radar:", error);
+            noDataMsg.className = 'alert alert-danger text-center mt-3'; 
+            noDataMsg.innerHTML = 'ERRORE: Impossibile caricare i dati del grafico. Controlla la console per i dettagli.';
+            noDataMsg.style.display = 'block';
+        });
+}
+
+/**
+ * Disegna il grafico radar usando Chart.js
+ */
+function drawRadarChart(data) {
+    const labels = data.map(item => item.nome_categoria);
+    const punteggi = data.map(item => item.peso_totale);
+    
+    // Trova il massimo per impostare l'asse correttamente
+    const maxScore = Math.max(...punteggi, 0) > 0 ? Math.max(...punteggi) + 10 : 100;
+
+    const ctx = document.getElementById('radarChart').getContext('2d');
+    
+    if (window.myRadarChart) {
+        window.myRadarChart.destroy();
+    }
+
+    window.myRadarChart = new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Punteggio per Categoria',
+                data: punteggi,
+                backgroundColor: 'rgba(25, 135, 84, 0.5)', 
+                borderColor: 'rgba(25, 135, 84, 1)',
+                pointBackgroundColor: 'rgba(25, 135, 84, 1)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgba(25, 135, 84, 1)',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            // maintainAspectRatio: true è fondamentale per il corretto ridimensionamento all'interno di col-md-6 con altezza fissa
+            maintainAspectRatio: true, 
+            scales: {
+                r: {
+                    angleLines: {
+                        display: true
+                    },
+                    suggestedMin: 0,
+                    suggestedMax: maxScore,
+                    ticks: {
+                        backdropColor: 'rgba(255, 255, 255, 0.7)',
+                        stepSize: Math.ceil(maxScore / 50) * 5 
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+}
+</script>
+{% endblock %}

@@ -2,6 +2,7 @@
 
 {% block title %}Dettaglio Report Questionario{% endblock %}
 
+
 {% block content %}
 <div class="row">
     <div class="col-12">
@@ -23,10 +24,21 @@
         </div>
     </div>
 </div>
+
 <div class="row mt-3">
     <div class="col-12 text-end">
+        <a href="{{ url_for('punteggio.dashboard_questionario_page', id_progetto_questionario=id_progetto_questionario) }}" 
+           class="btn btn-info me-2"
+           title="Visualizza i grafici del punteggio per questo questionario.">
+            <i class="bi bi-graph-up"></i> Visualizza Dashboard
+        </a>
+        
         <button id="salvaButton" class="btn btn-success me-2" style="display: none;">
             <i class="bi bi-save"></i> Salva Risposte
+        </button>
+        <button id="concludiButton" class="btn btn-primary me-2" style="display: none;" disabled
+                title="Devi rispondere e salvare tutte le domande prima di concludere.">
+            <i class="bi bi-check2-circle"></i> Concludi Questionario
         </button>
         <a href="{{ url_for('appBT.report_progetti_questionari_page') }}" class="btn btn-secondary">
             <i class="bi bi-arrow-left"></i> Torna alla Lista
@@ -36,21 +48,34 @@
 {% endblock %} 
 
 {% block scripts %}
+
 <script>
-// Variabile globale per tracciare le risposte selezionate
+// Variabile globale per tracciare le risposte selezionate (anche quelle non salvate)
 let risposteSelezionate = {};
+// Variabile globale per tracciare i dati del report (stato salvato dal DB)
+let currentReportData = [];
 
 document.addEventListener('DOMContentLoaded', function() {
     const idProgettoQuestionario = "{{ id_progetto_questionario }}";
     
     const salvaButton = document.getElementById('salvaButton');
+    const concludiButton = document.getElementById('concludiButton'); 
 
     if (salvaButton) {
         salvaButton.addEventListener('click', function() {
-            salvaRisposteMassive(idProgettoQuestionario);
+            salvaRisposteMassive(idProgettoQuestionario); 
         });
     } else {
         console.error("Elemento 'salvaButton' non trovato nel DOM.");
+    }
+    
+    if (concludiButton) {
+        concludiButton.addEventListener('click', function() {
+            // Prima salva, poi calcola
+            salvaRisposteMassive(idProgettoQuestionario, true); 
+        });
+    } else {
+        console.error("Elemento 'concludiButton' non trovato nel DOM.");
     }
 
     fetchDettaglioReport(idProgettoQuestionario);
@@ -58,19 +83,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 // ======================================================================
-// 0. FUNZIONE DI UTILITY PER MESSAGGI (Sostituisce alert())
+// 0. FUNZIONE DI UTILITY PER MESSAGGI 
 // ======================================================================
-
-/**
- * Mostra un messaggio di notifica (successo/errore) in pagina con fade out automatico.
- */
 function displayMessage(message, type = 'success', duration = 5000) {
     const container = document.getElementById('messageContainer');
     if (!container) return; 
 
     const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
     
-    // Rimuove qualsiasi messaggio precedente
     container.innerHTML = ''; 
 
     const alertDiv = document.createElement('div');
@@ -83,7 +103,6 @@ function displayMessage(message, type = 'success', duration = 5000) {
     
     container.appendChild(alertDiv);
 
-    // Rimuovi il messaggio dopo 'duration' millisecondi
     setTimeout(() => {
         if (alertDiv) {
             alertDiv.classList.remove('show');
@@ -92,24 +111,27 @@ function displayMessage(message, type = 'success', duration = 5000) {
     }, duration); 
 }
 
+
 // ======================================================================
-// 1. GESTIONE CARICAMENTO DATI
+// 1. GESTIONE CARICAMENTO DATI (Ora senza grafico)
 // ======================================================================
-/**
- * Funzione per recuperare i dati del report tramite API e renderizzare il contenuto.
- */
 function fetchDettaglioReport(id) {
     const reportContainer = document.getElementById('reportContainer');
     const loadingMessage = document.getElementById('loadingMessage');
     const salvaButton = document.getElementById('salvaButton'); 
+    const concludiButton = document.getElementById('concludiButton');
 
-    // Setup Iniziale della UI con controlli di esistenza
+    // Setup Iniziale della UI
     if (loadingMessage) {
         loadingMessage.style.display = 'block';
     }
     
     if (salvaButton) {
         salvaButton.style.display = 'none'; 
+    }
+    if (concludiButton) {
+        concludiButton.style.display = 'none'; 
+        concludiButton.disabled = true; 
     }
     
     reportContainer.innerHTML = ''; 
@@ -129,6 +151,7 @@ function fetchDettaglioReport(id) {
         })
         .then(data => {
             risposteSelezionate = {}; 
+            currentReportData = data; 
             
             if (loadingMessage) { 
                 loadingMessage.style.display = 'none'; 
@@ -138,21 +161,22 @@ function fetchDettaglioReport(id) {
                 if (salvaButton) { 
                     salvaButton.style.display = 'inline-block';
                 }
+                if (concludiButton) { 
+                    concludiButton.style.display = 'inline-block';
+                }
                 renderReport(data); 
+                checkCompletionStatus(); 
+                
+                // ? RIMOZIONE: Eliminata la chiamata fetchAndDrawRadarChart(id);
             } else {
                 reportContainer.innerHTML = '<div class="alert alert-info p-5 text-center">Nessuna domanda associata a questo questionario o dati non disponibili.</div>';
             }
         })
         .catch(error => {
             console.error('Errore nel recupero del report:', error);
-            
-            if (loadingMessage) { 
-                loadingMessage.style.display = 'none'; 
-            }
-            
-            if (salvaButton) { 
-                salvaButton.style.display = 'none'; 
-            }
+            if (loadingMessage) loadingMessage.style.display = 'none'; 
+            if (salvaButton) salvaButton.style.display = 'none'; 
+            if (concludiButton) concludiButton.style.display = 'none'; 
             
             reportContainer.innerHTML = `<div class="alert alert-danger p-5 text-center">
                 **Errore nel caricamento dei dati:** ${error.message}. Per favore, riprova.
@@ -162,25 +186,18 @@ function fetchDettaglioReport(id) {
 
 
 // ======================================================================
-// 2. RENDERING DEI DATI
+// 2. RENDERING DEI DATI 
 // ======================================================================
 
-/**
- * Gestisce il cambio di selezione di un radio button, aggiornando la variabile globale.
- */
 function handleRispostaChange(radioElement) {
     const idAssociazione = parseInt(radioElement.getAttribute('data-id-associazione'));
     const idRisposta = parseInt(radioElement.value);
 
-    // Aggiorna lo stato della risposta
     risposteSelezionate[idAssociazione] = idRisposta;
 
     console.log(`Risposta selezionata: Associazione ID ${idAssociazione}, Risposta ID ${idRisposta}`);
 }
 
-/**
- * Funzione di rendering per costruire l'accordion delle domande.
- */
 function renderReport(data) {
     const container = document.getElementById('reportContainer');
     container.innerHTML = ''; 
@@ -266,14 +283,12 @@ function renderReport(data) {
 
 
 // ======================================================================
-// 3. GESTIONE INTERAZIONE UTENTE E SALVATAGGIO
+// 3. GESTIONE INTERAZIONE UTENTE E SALVATAGGIO 
 // ======================================================================
-
-/**
- * Prepara e invia i dati per il salvataggio massivo.
- */
-function salvaRisposteMassive(idProgettoQuestionario) {
+function salvaRisposteMassive(idProgettoQuestionario, triggerConcludi = false) {
     const salvaButton = document.getElementById('salvaButton');
+    const concludiButton = document.getElementById('concludiButton');
+    
     const risposteDaSalvare = [];
 
     for (const idAssociazione in risposteSelezionate) {
@@ -288,17 +303,20 @@ function salvaRisposteMassive(idProgettoQuestionario) {
         return;
     }
 
-    // Disabilita il pulsante
+    // Disabilita i pulsanti
     if (salvaButton) { 
         salvaButton.disabled = true;
         salvaButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Salvataggio...';
     }
+    if (concludiButton) {
+        concludiButton.disabled = true; 
+    }
+
 
     fetch('/api/risposta_cliente/salva_risposte_massive', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            // Correzione e gestione del caso in cui csrf_token non sia disponibile
             'X-CSRFToken': '{{ csrf_token if csrf_token else "" }}' 
         },
         body: JSON.stringify(risposteDaSalvare)
@@ -312,20 +330,24 @@ function salvaRisposteMassive(idProgettoQuestionario) {
         return response.json();
     })
     .then(data => {
-        // Riabilita il pulsante
+        // Riabilita il pulsante Salva
         if (salvaButton) {
             salvaButton.disabled = false;
             salvaButton.innerHTML = '<i class="bi bi-save"></i> Salva Risposte';
         }
 
         if (data.success) {
-            // ⭐ SUCCESS: Usa displayMessage
-            displayMessage(`Salvataggio di ${risposteDaSalvare.length} risposte completato con successo! 🎉`, 'success');
+            displayMessage(`Salvataggio di ${risposteDaSalvare.length} risposte completato con successo! ??`, 'success');
             
-            // Ricarica i dati per vedere lo stato aggiornato
+            // Ricarica per aggiornare gli indicatori di risposta salvata
             fetchDettaglioReport(idProgettoQuestionario); 
+            
+            // Se l'utente ha premuto 'Concludi', prosegui con il calcolo del punteggio
+            if (triggerConcludi) {
+                concludiQuestionario(idProgettoQuestionario);
+            }
+            
         } else {
-            // ⭐ ERRORE API: Usa displayMessage
             displayMessage('ERRORE: ' + (data.error || 'Si è verificato un errore nel salvataggio.'), 'danger');
             console.error('Errore API:', data.error);
         }
@@ -336,10 +358,112 @@ function salvaRisposteMassive(idProgettoQuestionario) {
             salvaButton.disabled = false;
             salvaButton.innerHTML = '<i class="bi bi-save"></i> Salva Risposte';
         }
-        // ⭐ ERRORE CATCH: Usa displayMessage
+        if (concludiButton) {
+             concludiButton.disabled = false; 
+        }
+
         displayMessage('ERRORE CRITICO: Impossibile comunicare con il server per il salvataggio: ' + error.message, 'danger');
         console.error('Errore di salvataggio:', error);
     });
 }
+
+// ======================================================================
+// 4. FUNZIONE DI CONTROLLO STATO 
+// ======================================================================
+function checkCompletionStatus() {
+    const concludiButton = document.getElementById('concludiButton');
+    
+    if (!concludiButton || currentReportData.length === 0) {
+        if (concludiButton) {
+            concludiButton.disabled = true;
+            concludiButton.title = "Nessuna domanda da rispondere.";
+        }
+        return; 
+    }
+
+    const totalDomande = currentReportData.length;
+    let answeredDomandeCount = 0;
+    
+    const allQuestionsSaved = currentReportData.every(domanda => {
+        if (domanda.risposta_salvata_id) {
+            answeredDomandeCount++;
+            return true;
+        }
+        return false;
+    });
+
+    if (allQuestionsSaved) {
+        concludiButton.disabled = false; // Abilita
+        concludiButton.title = "Questionario completo e risposte salvate. Clicca per concludere e calcolare il punteggio.";
+    } else {
+        concludiButton.disabled = true; // Disabilita
+        concludiButton.title = `Devi salvare le risposte a tutte le domande (${answeredDomandeCount}/${totalDomande} risposte salvate) prima di concludere.`;
+    }
+}
+
+
+// ======================================================================
+// 5. FUNZIONE: CONCLUDI QUESTIONARIO E CALCOLA PUNTEGGIO (Corretta)
+// ======================================================================
+function concludiQuestionario(idProgettoQuestionario) {
+    const concludiButton = document.getElementById('concludiButton');
+
+    // Disabilita il pulsante "Concludi"
+    if (concludiButton) { 
+        concludiButton.disabled = true;
+        concludiButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Calcolo in corso...';
+    }
+
+    const url = `/api/punteggio/calcola/${idProgettoQuestionario}`;
+
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token if csrf_token else "" }}' 
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(errorData => {
+                throw new Error(errorData.error || `Errore HTTP: ${response.status}`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        // Riabilita il pulsante e aggiorna il testo
+        if (concludiButton) {
+            concludiButton.disabled = false;
+            concludiButton.innerHTML = '<i class="bi bi-check2-circle"></i> Concludi Questionario';
+        }
+
+        if (data.success) {
+            displayMessage(`? Calcolo punteggio completato! Righe inserite: ${data.risultati.rows_affected}.`, 'success', 8000);
+            
+            // ? RIMOZIONE: Eliminata la chiamata fetchAndDrawRadarChart(idProgettoQuestionario);
+            
+        } else {
+            displayMessage('ERRORE Calcolo Punteggio: ' + (data.error || 'Si è verificato un errore nel calcolo.'), 'danger');
+            console.error('Errore API calcolo punteggio:', data.error);
+        }
+        checkCompletionStatus(); 
+    })
+    .catch(error => {
+        // Gestione errore di rete/API
+        if (concludiButton) {
+            concludiButton.disabled = false;
+            concludiButton.innerHTML = '<i class="bi bi-check2-circle"></i> Concludi Questionario';
+        }
+        displayMessage('ERRORE CRITICO: Impossibile comunicare con il server per il calcolo del punteggio: ' + error.message, 'danger');
+        console.error('Errore di calcolo punteggio:', error);
+        checkCompletionStatus();
+    });
+}
+
+
+// ======================================================================
+// ? RIMOZIONE: Tutte le funzioni di GESTIONE GRAFICO RADAR sono state rimosse
+// ======================================================================
 </script>
 {% endblock %}
