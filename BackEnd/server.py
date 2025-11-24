@@ -114,6 +114,9 @@ from Classi.ClasseRisposteCliente.Controller_risposta_cliente import risposta_cl
 from Classi.ClassePunteggi.Service_progetto_questionario_punteggio import ServiceProgettoQuestionarioPunteggio
 from Classi.ClassePunteggi.Controller_progetto_questionario_punteggio import punteggio_controller
 
+from Classi.ClasseCorrettive.Service_correttiva import ServiceCorrettiva 
+from Classi.ClasseCorrettive.Controller_correttiva import correttiva_controller
+
 # Inizializzazione del logging
 logging.basicConfig(level=logging.INFO)
 
@@ -1463,6 +1466,8 @@ if __name__ == '__main__':
     app.register_blueprint(risposta_cliente_controller)
 
     app.register_blueprint(punteggio_controller)
+
+    app.register_blueprint(correttiva_controller)
     
     print("DEBUG: Registrando la rotta di upload 'upload_domande' con prefisso /api/domande/upload")
     app.add_url_rule('/api/domande/upload', 'upload_domande', upload_domande, methods=['POST'])

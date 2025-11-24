@@ -29,18 +29,15 @@ class TDomanda(Base):
     modificato_da = Column('MODIFICATO_DA', String(100), nullable=True)
 
     # Definizione della relazione con TDriver
-    # 'driver_rel' sara un attributo su TDomanda per accedere ai dettagli del driver associato
-    # backref='domande' creera un attributo 'domande' su TDriver per accedere alle domande associate
-    driver_rel = relationship('TDriver', backref='domande')
+    # 🚀 FIX CRITICO: Forzatura della chiave esterna per risolvere N/D
+    driver_rel = relationship('TDriver', backref='domande', foreign_keys=[id_driver])
 
     # NUOVA RELAZIONE con TGruppoRisposta
     gruppo_risposta_rel = relationship(
         'TGruppoRisposta', 
-        backref='domande_associate' # 'domande_associate' = nome dell'attributo su TGruppoRisposta
+        backref='domande', 
+        foreign_keys=[id_gruppo_risposta]
     )
 
     def __repr__(self):
-        """
-        Rappresentazione stringa dell'oggetto TDomanda.
-        """
-        return f"<TDomanda(id={self.id}, descr='{self.descr[:30]}...', id_driver={self.id_driver})>"
+        return f"<TDomanda(id={self.id}, descr='{self.descr}', id_driver={self.id_driver})>"

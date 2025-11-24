@@ -34,45 +34,26 @@
             border: 1px solid #cce5ff;  
         }
 
-        /* 🟢 Riduci il padding all'interno della card-body per compattare */
+        /* 🟢 Riduci il padding all'interno del corpo della card per maggiore compattezza */
         #addEditCard .card-body {
-            padding: 0.75rem; 
-        }
-        
-        /* 🟢 Aumentato il font dei campi a 1em per eguagliare il font standard della sezione "Filtro Domande" */
-        #addEditCard label,
-        #addEditCard .form-control,
-        #addEditCard .form-select,
-        #addEditCard .form-label,
-        #addEditCard textarea {
-            font-size: 1em; 
-        }
-        
-        /* 🟢 Riduci il margine inferiore dei campi del form */
-        #addEditCard .mb-3 {
-            margin-bottom: 0.5rem !important;
-        }
-        
-        /* Aggiungo dimensione ridotta anche ai bottoni per coerenza */
-        #addEditCard .btn {
-            font-size: 0.8em; 
-            padding: 0.25rem 0.5rem;
+            padding: 0.8rem; /* Padding ridotto */
         }
     </style>
 {% endblock head_extra %}
 
+
 {% block content %}
 <div class="container mt-4">
-    {# Contenitore per i messaggi flash gestiti da JavaScript ##}
+    {# Contenitore per i messaggi flash gestiti da JavaScript #}
     <div class="messages mb-3"></div>
 
-    <div class="d-flex justify-content-end align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h5 class="mb-0 text-primary">Gestione Anagrafica Domande</h5>
         <a href="{{ url_for('appBT.index') }}" class="btn btn-info btn-sm">
             <i class="fas fa-arrow-left me-1"></i> Torna alla Home
         </a>
     </div>
 
-    {# AGGIUNTO ID: addEditCard per il CSS #}
     <div class="card mb-4 shadow-sm" id="addEditCard">
         <div class="card-header bg-primary text-white">
             <h5 class="mb-0">Aggiungi / Modifica Domanda</h5>
@@ -80,37 +61,37 @@
         <div class="card-body">
             <form id="domandaForm">
                 <input type="hidden" id="domandaId">
-                <input type="hidden" id="csrf_token" name="csrf_token" value="{{ csrf_token }}">
                 
-                <div class="mb-3">
-                    <label for="idDriver" class="form-label">Driver</label>
-                    <select class="form-select" id="idDriver" required>
-                        </select>
-                </div>
-                
-                <div class="mb-3">
-                    <label for="descr" class="form-label">Descrizione Domanda</label>
-                    <textarea class="form-control" id="descr" rows="3" required></textarea>
-                </div>
-                
-                {# Pulsanti Salva e Annulla/Nuovo #}
-                <button type="submit" class="btn btn-success me-2">Salva</button>
-                <button type="button" class="btn btn-secondary" id="resetFormBtn">Annulla/Nuovo</button>
-            </form>
-        </div>
-    </div>
+                <input type="hidden" id="csrf_token" name="csrf_token" value="{{ csrf_token }}"> 
 
-    <div class="card mb-4 shadow-sm">
-        <div class="card-header bg-secondary text-white">
-            <h5 class="mb-0">Filtro Domande</h5>
-        </div>
-        <div class="card-body">
-            <div class="mb-3">
-                <label for="filterDriverSelect" class="form-label">Filtra per Driver</label>
-                <select class="form-select" id="filterDriverSelect">
-                    <option value="">Tutti i Driver</option>
-                    </select>
-            </div>
+                <div class="row">
+                    <div class="col-md-12 mb-3">
+                        <label for="descr" class="form-label">Testo Domanda</label>
+                        <textarea class="form-control" id="descr" rows="3" required placeholder="Inserisci il testo completo della domanda."></textarea>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="idDriver" class="form-label">Driver associato</label>
+                        <select class="form-select" id="idDriver" required>
+                            </select>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="idGruppoRisposta" class="form-label">Gruppo Risposta (Opzionale)</label>
+                        <select class="form-select" id="idGruppoRisposta">
+                            </select>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end mt-2">
+                    <button type="button" class="btn btn-secondary btn-sm me-2" id="resetFormBtn">
+                        <i class="fas fa-eraser me-1"></i> Annulla / Reset
+                    </button>
+                    <button type="submit" class="btn btn-success btn-sm">
+                        <i class="fas fa-save me-1"></i> Salva Domanda
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -119,498 +100,266 @@
             <h5 class="mb-0">Elenco Domande</h5>
         </div>
         <div class="card-body">
+            <div class="mb-3 d-flex justify-content-end">
+                <div class="col-md-4">
+                    <label for="filterDriver" class="form-label visually-hidden">Filtra per Driver</label>
+                    <select class="form-select form-select-sm" id="filterDriver">
+                        </select>
+                </div>
+            </div>
+
             <div class="table-responsive">
-                <table class="table table-striped table-hover" id="domandeTable">
+                <table class="table table-sm table-hover" id="domandeTable">
                     <thead>
                         <tr>
-                            {# COLONNE NASCOSTE: ID, Driver (ID), Gruppo Risposta (ID) #}
-                            <th class="d-none">ID</th>
-                            <th class="d-none">Driver (ID)</th>
-                            <th>Driver</th>
-                            <th class="d-none">Gruppo Risposta (ID)</th>
-                            <th>Gruppo Risposta</th>
-                            <th>Descrizione</th>
-                            <th>Ultima Modifica</th>
-                            <th>Modificato Da</th>
-                            <th>Azioni</th>
+                            <th scope="col" style="width: 5%;">ID</th>
+                            <th scope="col" style="width: 50%;">Domanda</th>
+                            <th scope="col" style="width: 20%;">Driver</th>
+                            <th scope="col" style="width: 15%;">Gruppo Risposta</th>
+                            <th scope="col" style="width: 10%;">Azioni</th>
                         </tr>
                     </thead>
                     <tbody id="domandeTableBody">
+                        <tr><td colspan="5" class="text-center">Caricamento domande...</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
 </div>
-
-<div class="modal fade" id="associateGruppoRispostaModal" tabindex="-1" aria-labelledby="associateGruppoRispostaModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-secondary text-white">
-                <h5 class="modal-title" id="associateGruppoRispostaModalLabel">Associa Gruppo Risposta</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form id="associateGruppoRispostaForm">
-                <div class="modal-body">
-                    <input type="hidden" id="modalDomandaId">
-                    <p>Stai modificando l'associazione per la Domanda ID: <strong id="modalDomandaIdDisplay"></strong></p>
-                    <p>Gruppo attualmente associato: <span id="modalCurrentGruppoRisposta" class="badge bg-warning">Nessuno</span></p>
-
-                    <div class="mb-3">
-                        <label for="modalIdGruppoRisposta" class="form-label">Seleziona Nuovo Gruppo Risposta</label>
-                        <select class="form-select" id="modalIdGruppoRisposta">
-                            </select>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
-                    <button type="submit" class="btn btn-primary">Salva Associazione</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 {% endblock content %}
+
 
 {% block scripts %}
 <script>
-    // URL base dell'API (assumendo che sia sulla stessa origine)
-    const API_BASE_URL = window.location.origin;
-    const DOMANDA_API_URL = `${API_BASE_URL}/api/domanda/`;
-    const DRIVER_API_URL_FOR_DROPDOWN = `${API_BASE_URL}/api/domanda/drivers`;
-    const GRUPPO_RISPOSTA_API_URL_FOR_DROPDOWN = `${API_BASE_URL}/api/domanda/gruppi_risposta`; 
-
-    // Funzione helper per mostrare messaggi flash
-    function showFlashMessage(message, type = 'success') {
-        const messagesContainer = document.querySelector('.messages');
-        if (!messagesContainer) return;
-
-        const alertDiv = document.createElement('div');
-        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
-        alertDiv.role = 'alert';
-        alertDiv.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        `;
-
-        messagesContainer.appendChild(alertDiv);
-        
-        // Rimuove il messaggio dopo 5 secondi
-        setTimeout(() => {
-            alertDiv.classList.remove('show');
-            alertDiv.classList.add('fade');
-            alertDiv.remove();
-        }, 5000);
-    }
-
-    // Funzione helper per formattare la data
-    function formatDate(dateString) {
-        if (!dateString) return '';
-        try {
-            const date = new Date(dateString);
-            if (isNaN(date)) {
-                return dateString;
-            }
-            return date.toLocaleDateString('it-IT', { 
-                year: 'numeric', 
-                month: '2-digit', 
-                day: '2-digit', 
-                hour: '2-digit', 
-                minute: '2-digit', 
-                second: '2-digit' 
-            });
-        } catch (e) {
-            console.error("Errore di formattazione data:", e);
-            return dateString;
-        }
-    }
-
     document.addEventListener('DOMContentLoaded', function() {
-        const domandaIdInput = document.getElementById('domandaId');
-        const idDriverSelect = document.getElementById('idDriver');
-        const descrInput = document.getElementById('descr');
+        // --- CONSTANTI API URL ---
+        const DOMANDA_API_URL = '/api/domanda/';
+        const DRIVER_API_URL = '/api/domanda/drivers';
+        const GRUPPO_RISPOSTA_API_URL = '/api/domanda/gruppi_risposta';
+
+        // --- VARIABILI DOM E TOKEN CSRF ---
+        const messagesContainer = document.querySelector('.messages');
         const domandaForm = document.getElementById('domandaForm');
+        const domandaIdInput = document.getElementById('domandaId');
+        const descrInput = document.getElementById('descr');
+        const idDriverSelect = document.getElementById('idDriver');
+        const idGruppoRispostaSelect = document.getElementById('idGruppoRisposta');
         const domandeTableBody = document.getElementById('domandeTableBody');
-        const resetFormBtn = document.getElementById('resetFormBtn'); 
-        const filterDriverSelect = document.getElementById('filterDriverSelect');
-        const csrfToken = document.getElementById('csrf_token').value; 
+        const resetFormBtn = document.getElementById('resetFormBtn');
+        const filterDriverSelect = document.getElementById('filterDriver');
 
-        // VARIABILI PER LA MODAL
-        const modalIdGruppoRispostaSelect = document.getElementById('modalIdGruppoRisposta');
-        const modalDomandaIdInput = document.getElementById('modalDomandaId');
-        const associateGruppoRispostaForm = document.getElementById('associateGruppoRispostaForm');
-        const modalCurrentGruppoRispostaSpan = document.getElementById('modalCurrentGruppoRisposta');
-        const modalDomandaIdDisplay = document.getElementById('modalDomandaIdDisplay');
+        // ✅ RECUPERO TOKEN CSRF - CERCATO NELL'INPUT APPENA AGGIUNTO
+        const csrfTokenElement = document.getElementById('csrf_token');
+        const csrfToken = csrfTokenElement ? csrfTokenElement.value : null;
 
+        if (!csrfToken) {
+            console.error("ERRORE: CSRF token non trovato nel DOM. Le richieste POST/PUT/DELETE falliranno.");
+        }
 
-        // Funzione per popolare il dropdown dei Driver
+        // --- FUNZIONI UTILITY ---
+
+        // Funzione per mostrare messaggi flash
+        function showFlashMessage(message, type) {
+            const alert = `<div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                                ${message}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                           </div>`;
+            messagesContainer.innerHTML = alert;
+            // Rimuovi il messaggio dopo 5 secondi
+            setTimeout(() => {
+                messagesContainer.innerHTML = '';
+            }, 5000);
+        }
+
+        // --- FUNZIONI DI CARICAMENTO DATI ---
+
+        // Caricamento dei Driver per i due dropdown
         async function loadDriversForDropdowns() {
-             try {
-                const response = await fetch(DRIVER_API_URL_FOR_DROPDOWN);
+            try {
+                const response = await fetch(DRIVER_API_URL);
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    // Genera un errore che include lo status HTTP
+                    throw new Error(`API Driver status: ${response.status}`);
                 }
                 const drivers = await response.json();
-                
-                // Popola il dropdown di creazione/modifica
-                idDriverSelect.innerHTML = '<option value="">Seleziona Driver</option>';
-                drivers.forEach(driver => {
-                    const option = document.createElement('option');
-                    option.value = driver.id;
-                    option.textContent = driver.descr;
-                    idDriverSelect.appendChild(option);
-                });
 
-                // Popola il dropdown di filtro
-                filterDriverSelect.innerHTML = '<option value="">Tutti i Driver</option>';
-                drivers.forEach(driver => {
-                    const option = document.createElement('option');
-                    option.value = driver.id;
-                    option.textContent = driver.descr;
-                    filterDriverSelect.appendChild(option);
-                });
+                // Funzione interna per popolare un dropdown specifico
+                const populateDropdown = (selectElement, isFilter) => {
+                    // Controlla per 'null' o 'undefined' prima di procedere
+                    if (!selectElement) {
+                        return;
+                    }
+                    
+                    let options = isFilter 
+                        ? '<option value="">Tutti i Driver</option>'
+                        : '<option value="">Seleziona un Driver</option>'; 
+
+                    drivers.forEach(driver => {
+                        options += `<option value="${driver.id}">${driver.descr}</option>`;
+                    });
+                    selectElement.innerHTML = options;
+                };
+
+                // Popola il dropdown del form (richiesto)
+                populateDropdown(idDriverSelect, false);
+                // Popola il dropdown del filtro (opzionale)
+                populateDropdown(filterDriverSelect, true);
+
             } catch (error) {
-                console.error("Errore nel caricamento dei driver:", error);
-                showFlashMessage(`Errore nel caricamento dei driver: ${error.message}`, 'danger');
+                // ✅ CORREZIONE: Mostra l'errore dettagliato (incluso lo status HTTP)
+                const errorMessage = error.message.includes('status:') ? error.message : "Errore di rete o JSON non valido";
+                console.error("Errore nel caricamento dei Driver:", error);
+                showFlashMessage(`Errore critico nel caricamento dei Driver: ${errorMessage}`, 'danger');
             }
         }
-        
-        // Funzione: Carica i Gruppi Risposta per il dropdown del modal
+
+        // Caricamento dei Gruppi Risposta per la select
         async function loadGruppiRispostaForDropdown() {
+            const selectElement = idGruppoRispostaSelect; 
+            
+            // ✅ CORREZIONE JS: Aggiunto controllo di null prima di accedere a innerHTML
+            if (!selectElement) {
+                console.warn("Elemento 'idGruppoRisposta' non trovato. Impossibile popolare il dropdown Gruppi Risposta.");
+                showFlashMessage("Errore: Elemento HTML per 'Gruppo Risposta' non trovato.", 'danger');
+                return;
+            }
+            
             try {
-                const response = await fetch(GRUPPO_RISPOSTA_API_URL_FOR_DROPDOWN);
+                const response = await fetch(GRUPPO_RISPOSTA_API_URL);
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+                    // Genera un errore che include lo status HTTP
+                    throw new Error(`API Gruppo Risposta status: ${response.status}`);
                 }
                 const gruppi = await response.json();
                 
-                // Opzione per NULL/Rimuovi
-                modalIdGruppoRispostaSelect.innerHTML = '<option value="">Nessun Gruppo Risposta (Rimuovi)</option>'; 
+                let options = '<option value="">Nessun Gruppo</option>'; 
                 gruppi.forEach(gruppo => {
-                    const option = document.createElement('option');
-                    option.value = gruppo.id; 
-                    option.textContent = gruppo.descr;
-                    modalIdGruppoRispostaSelect.appendChild(option);
+                    options += `<option value="${gruppo.id}">${gruppo.descr}</option>`;
                 });
+                selectElement.innerHTML = options;
+
             } catch (error) {
-                console.error("Errore nel caricamento dei gruppi risposta:", error);
-                showFlashMessage(`Errore nel caricamento dei gruppi risposta: ${error.message}`, 'danger');
+                // ✅ CORREZIONE: Mostra l'errore dettagliato (incluso lo status HTTP)
+                const errorMessage = error.message.includes('status:') ? error.message : "Errore di rete o JSON non valido";
+                console.error("Errore nel caricamento dei Gruppi Risposta:", error);
+                showFlashMessage(`Errore nel caricamento dei Gruppi Risposta: ${errorMessage}`, 'danger');
             }
         }
-
-        // Funzione: Apre il modal e pre-popola i dati
-        function openAssociateModal(domandaId, gruppoDescr, gruppoId) {
-            modalDomandaIdInput.value = domandaId;
-            modalDomandaIdDisplay.textContent = domandaId;
-
-            // Aggiorna l'associazione corrente (UI)
-            if (gruppoDescr) {
-                modalCurrentGruppoRispostaSpan.textContent = gruppoDescr;
-                modalCurrentGruppoRispostaSpan.classList.remove('bg-warning');
-                modalCurrentGruppoRispostaSpan.classList.add('bg-success');
-            } else {
-                modalCurrentGruppoRispostaSpan.textContent = 'Nessuno';
-                modalCurrentGruppoRispostaSpan.classList.remove('bg-success');
-                modalCurrentGruppoRispostaSpan.classList.add('bg-warning');
-            }
-            
-            // Pre-seleziona l'opzione corrente nel dropdown
-            modalIdGruppoRispostaSelect.value = gruppoId || ''; 
-            
-            // Mostra la modal
-            const modalElement = document.getElementById('associateGruppoRispostaModal');
-            const modal = new bootstrap.Modal(modalElement);
-            modal.show();
-        }
-
-        // Funzione: loadDomande (CORREZIONE: Aggiunto CSRF Token all'header per la richiesta GET)
+        
+        // Caricamento delle Domande nella tabella
         async function loadDomande() {
+            domandeTableBody.innerHTML = '<tr><td colspan="5" class="text-center">Caricamento in corso...</td></tr>';
+            
+            const selectedDriverId = filterDriverSelect.value;
+            let url = DOMANDA_API_URL;
+            if (selectedDriverId) {
+                // Modifica l'URL per includere il filtro
+                url += `?id_driver_filter=${selectedDriverId}`;
+            }
+
             try {
-                const filterDriverId = filterDriverSelect ? filterDriverSelect.value : '';
-                const url = filterDriverId ? `${DOMANDA_API_URL}?id_driver_filter=${filterDriverId}` : DOMANDA_API_URL;
-                
-                const response = await fetch(url, {
-                    method: 'GET',
-                    // ⬇️ Aggiunge l'header CSRF per prevenire blocchi sulle GET con query params
-                    headers: {
-                        'X-CSRFToken': csrfToken
-                    }
-                });
-                
+                const response = await fetch(url);
                 if (!response.ok) {
-                    // Tenta di leggere l'errore come JSON, altrimenti usa il testo
-                    let errorMsg = 'Errore nel recupero delle domande.';
-                    try {
-                        const error = await response.json();
-                        errorMsg = error.error || errorMsg;
-                    } catch (e) {
-                        errorMsg = `Errore HTTP! Stato: ${response.status}`;
-                    }
-                    throw new Error(errorMsg);
+                    throw new Error(`API Domande status: ${response.status}`);
                 }
                 const domande = await response.json();
-
-                domandeTableBody.innerHTML = '';
-                // Totale colonne visibili (9 totali - 3 nascoste)
-                const VISIBLE_COLUMNS = 6; 
                 
+                let rows = '';
                 if (domande.length === 0) {
-                    const row = domandeTableBody.insertRow();
-                    const cell = row.insertCell(0);
-                    // Colspan aggiornato al numero di colonne visibili
-                    cell.colSpan = VISIBLE_COLUMNS; 
-                    cell.textContent = "Nessuna domanda trovata.";
-                    cell.classList.add('text-center', 'text-muted');
+                    rows = '<tr><td colspan="5" class="text-center">Nessuna domanda trovata per i criteri selezionati.</td></tr>';
                 } else {
                     domande.forEach(domanda => {
-                        const row = domandeTableBody.insertRow();
+                        // const driverDescr = domanda.driver ? domanda.driver.descr : 'N/D';
+                        const driverDescr = domanda.descr_driver || 'N/D';
+                        const gruppoRispostaDescr = domanda.gruppo_risposta ? domanda.gruppo_risposta.descr : '-';
                         
-                        // COLONNE NASCOSTE (Aggiunta classe 'd-none')
-                        row.insertCell(0).textContent = domanda.id;
-                        row.cells[0].classList.add('d-none'); // ID
-                        
-                        row.insertCell(1).textContent = domanda.id_driver;
-                        row.cells[1].classList.add('d-none'); // Driver (ID)
-                        
-                        // COLONNE VISIBILI
-                        row.insertCell(2).textContent = domanda.driver_descr || ''; // Driver (Descr)
-                        
-                        // COLONNA NASCOSTA
-                        row.insertCell(3).textContent = domanda.id_gruppo_risposta || '';
-                        row.cells[3].classList.add('d-none'); // Gruppo Risposta (ID)
-
-                        // COLONNE VISIBILI
-                        row.insertCell(4).textContent = domanda.gruppo_risposta_descr || ''; // Gruppo Risposta (Descr)
-                        row.insertCell(5).textContent = domanda.descr;
-                        row.insertCell(6).textContent = formatDate(domanda.data_ultima_modifica);
-                        row.insertCell(7).textContent = domanda.modificato_da || '';
-
-                        const actionsCell = row.insertCell(8);
-                        
-                        // CORREZIONE LAYOUT BOTTONI: Orizzontale, compatto e ridotto
-                        const btnsContainer = document.createElement('div');
-                        btnsContainer.classList.add('d-flex', 'gap-1', 'justify-content-start', 'action-btns'); 
-
-                        // BOTTONE "Associa Risposta"
-                        const associateBtn = document.createElement('button');
-                        associateBtn.textContent = 'Risposta';
-                        associateBtn.classList.add('btn', 'btn-secondary');
-                        associateBtn.type = 'button'; 
-                        associateBtn.onclick = () => openAssociateModal(domanda.id, domanda.gruppo_risposta_descr, domanda.id_gruppo_risposta); 
-
-                        // Bottone Modifica
-                        const editBtn = document.createElement('button');
-                        editBtn.textContent = 'Modifica';
-                        editBtn.classList.add('btn', 'btn-primary');
-                        editBtn.type = 'button'; 
-                        editBtn.onclick = () => editDomanda(domanda);
-                        
-                        // Bottone Elimina
-                        const deleteBtn = document.createElement('button');
-                        deleteBtn.textContent = 'Elimina';
-                        deleteBtn.classList.add('btn', 'btn-danger');
-                        deleteBtn.type = 'button'; 
-                        deleteBtn.onclick = () => deleteDomanda(domanda.id);
-
-                        btnsContainer.appendChild(associateBtn);
-                        btnsContainer.appendChild(editBtn);
-                        btnsContainer.appendChild(deleteBtn);
-                        
-                        actionsCell.appendChild(btnsContainer);
+                        rows += `
+                            <tr>
+                                <td>${domanda.id}</td>
+                                <td>${domanda.descr}</td>
+                                <td>${driverDescr}</td>
+                                <td>${gruppoRispostaDescr}</td>
+                                <td class="action-btns">
+                                    <button class="btn btn-primary btn-sm me-1 edit-btn" data-id="${domanda.id}">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-danger btn-sm delete-btn" data-id="${domanda.id}">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
                     });
                 }
+                domandeTableBody.innerHTML = rows;
+
+                // Aggiungi listener per i bottoni "Modifica"
+                domandeTableBody.querySelectorAll('.edit-btn').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const id = this.getAttribute('data-id');
+                        editDomanda(id);
+                    });
+                });
+                
+                // Aggiungi listener per i bottoni "Elimina"
+                domandeTableBody.querySelectorAll('.delete-btn').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const id = this.getAttribute('data-id');
+                        deleteDomanda(id);
+                    });
+                });
+
             } catch (error) {
-                console.error("Errore nel caricamento delle domande:", error);
-                showFlashMessage(`Errore: ${error.message}`, 'danger');
+                console.error("Errore nel caricamento delle Domande:", error);
+                domandeTableBody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">Errore nel caricamento dei dati: ${error.message}</td></tr>`;
+            }
+        }
+
+        // Funzione per popolare il form con i dati da modificare
+        async function editDomanda(id) {
+            try {
+                const response = await fetch(`${DOMANDA_API_URL}${id}`);
+                if (!response.ok) {
+                    throw new Error(`API Domanda status: ${response.status}`);
+                }
+                const domanda = await response.json();
+                
+                // Popola il form
+                domandaIdInput.value = domanda.id;
+                descrInput.value = domanda.descr;
+                idDriverSelect.value = domanda.id_driver;
+                
+                // Gestisce il gruppo risposta, che può essere null
+                idGruppoRispostaSelect.value = domanda.id_gruppo_risposta || ''; 
+                
+                // Scrolla in cima al form per l'editing
+                document.getElementById('addEditCard').scrollIntoView({ behavior: 'smooth' });
+
+            } catch (error) {
+                console.error(`Errore nel recupero della domanda ${id}:`, error);
+                showFlashMessage(`Errore nel recupero dei dati per la modifica: ${error.message}`, 'danger');
             }
         }
         
-        // Funzione: editDomanda
-        function editDomanda(domanda) {
-            console.log("Modifica domanda:", domanda);
-            domandaIdInput.value = domanda.id;
-            idDriverSelect.value = domanda.id_driver;
-            descrInput.value = domanda.descr;
-            
-            showFlashMessage("Dati caricati. Modifica 'Descrizione Domanda' o 'Driver' e poi Salva.", "info");
-        }
-
-        // RI-AGGIUNTO: Funzione per il submit form principale (POST/PUT)
-        domandaForm.addEventListener('submit', async function(event) {
-            event.preventDefault();
-            
-            const id = domandaIdInput.value;
-            const idDriver = idDriverSelect.value;
-            const descr = descrInput.value;
-            // csrfToken già recuperato all'inizio del DOMContentLoaded
-
-            if (!idDriver || !descr) {
-                showFlashMessage("Selezionare un Driver e inserire una Descrizione sono obbligatori.", "warning");
-                return;
-            }
-
-            let url = DOMANDA_API_URL;
-            let method = 'POST';
-            let successMessage = 'Domanda creata con successo!';
-            let errorMessage = 'Errore nella creazione della domanda.';
-            let bodyData = { 
-                // Includiamo csrf_token nel body per la POST da form submit
-                csrf_token: csrfToken, 
-                id_driver: parseInt(idDriver), 
-                descr: descr,
-                // Poiché la checkbox è stata rimossa, assumiamo sempre Abilitato=True per la creazione.
-                abilitato: true, 
-                id_gruppo_risposta: null 
-            };
-            
-            if (id) {
-                method = 'PUT';
-                url = `${DOMANDA_API_URL}${id}`;
-                successMessage = 'Domanda aggiornata con successo!';
-                errorMessage = 'Errore nell\'aggiornamento della domanda.';
-                
-                // Recupera l'associazione corrente e lo stato Abilitato prima di aggiornare
-                try {
-                    const getResponse = await fetch(`${DOMANDA_API_URL}${id}`, {
-                        method: 'GET',
-                        headers: {
-                            // ⬇️ Anche la GET singola necessita del CSRF
-                            'X-CSRFToken': csrfToken
-                        }
-                    });
-                    if (!getResponse.ok) {
-                         const error = await getResponse.json();
-                         throw new Error(error.error || 'Impossibile recuperare dati esistenti per l\'aggiornamento.');
-                    }
-                    const existingData = await getResponse.json();
-                    
-                    // Mantiene id_gruppo_risposta e abilitato esistenti, poiché non sono modificabili dal form
-                    bodyData.id_gruppo_risposta = existingData.id_gruppo_risposta || null;
-                    bodyData.abilitato = existingData.abilitato !== false; // Mantiene lo stato corrente
-                    
-                    // Per la PUT: usiamo l'header per il CSRF. Rimuovi dal body per evitare conflitti.
-                    delete bodyData.csrf_token;
-                    
-                } catch (e) {
-                    showFlashMessage(`Errore nel recupero dati per l'aggiornamento (PUT): ${e.message}`, 'danger');
-                    return;
-                }
-            }
-
-            try {
-                const headers = { 'Content-Type': 'application/json' };
-                // Aggiungiamo l'header CSRF per la PUT, NON per la POST (che lo ha nel body)
-                if (method === 'PUT') {
-                    headers['X-CSRFToken'] = csrfToken;
-                }
-
-                const response = await fetch(url, {
-                    method: method,
-                    headers: headers,
-                    body: JSON.stringify(bodyData)
-                });
-
-                const result = await response.json();
-
-                if (response.ok) {
-                    showFlashMessage(successMessage, 'success');
-                    domandaForm.reset();
-                    domandaIdInput.value = '';
-                    loadDomande();
-                } else {
-                    showFlashMessage(`${errorMessage}: ${result.error || ''}`, 'danger');
-                }
-            } catch (error) {
-                console.error("Errore nella richiesta API submit domanda (catch block):", error);
-                showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
-            }
-        });
-        
-        // RI-AGGIUNTO: Logica Reset Form
-        resetFormBtn.addEventListener('click', () => {
-            console.log("Resetting domanda form.");
-            domandaForm.reset();
-            domandaIdInput.value = '';
-            showFlashMessage("Form annullata. Pronto per una nuova Domanda.", "info");
-        });
-
-
-        // Sottomissione del Form della Modal (Associazione Gruppo Risposta) - CSRF in Header
-        associateGruppoRispostaForm.addEventListener('submit', async function(event) {
-            event.preventDefault();
-            
-            const domandaId = modalDomandaIdInput.value;
-            let newGruppoRispostaId = modalIdGruppoRispostaSelect.value;
-            
-            // Converte in intero o null se non selezionato (stringa vuota)
-            let numericGruppoRispostaId = newGruppoRispostaId ? parseInt(newGruppoRispostaId) : null;
-            
-            try {
-                // 1. Recupera i dati correnti della domanda (necessario per mantenere descr, id_driver, abilitato)
-                const getResponse = await fetch(`${DOMANDA_API_URL}${domandaId}`, {
-                     method: 'GET',
-                     headers: {
-                        // ⬇️ Anche la GET singola necessita del CSRF
-                        'X-CSRFToken': csrfToken
-                    }
-                });
-                if (!getResponse.ok) {
-                    const error = await getResponse.json();
-                    throw new Error(error.error || 'Impossibile recuperare i dati correnti della domanda.');
-                }
-                const domandaData = await getResponse.json();
-                
-                // 2. Prepara il payload per l'aggiornamento (PUT).
-                const payload = {
-                    descr: domandaData.descr,
-                    id_driver: domandaData.id_driver,
-                    id_gruppo_risposta: numericGruppoRispostaId, 
-                    abilitato: domandaData.abilitato // Mantiene lo stato attuale
-                };
-                
-                // 3. Esegui la PUT per aggiornare l'associazione, PASSANDO IL CSRF NELL'HEADER
-                const putResponse = await fetch(`${DOMANDA_API_URL}${domandaId}`, {
-                    method: 'PUT',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken 
-                    },
-                    body: JSON.stringify(payload)
-                });
-                
-                const result = await putResponse.json();
-                
-                if (putResponse.ok) {
-                    showFlashMessage(`Associazione Gruppo Risposta aggiornata per Domanda ID ${domandaId}.`, 'success');
-                    
-                    const modalElement = document.getElementById('associateGruppoRispostaModal');
-                    const modal = bootstrap.Modal.getInstance(modalElement);
-                    if (modal) { modal.hide(); }
-                    
-                    loadDomande(); 
-                } else {
-                    showFlashMessage(`Errore nell'associazione: ${result.error || 'Errore sconosciuto'}`, 'danger');
-                }
-
-            } catch (error) {
-                console.error("Errore nell'associazione Gruppo Risposta:", error);
-                showFlashMessage(`Errore di rete/server: ${error.message}`, 'danger');
-            }
-        });
-
-
-        // Funzione per l'eliminazione (CSRF in Header)
+        // Funzione per eliminare una domanda
         async function deleteDomanda(id) {
-            if (!confirm(`Sei sicuro di voler eliminare la domanda con ID ${id}?`)) {
+            if (!confirm('Sei sicuro di voler eliminare questa domanda? Questa operazione è irreversibile!')) {
                 return;
             }
+            
+            // ✅ VERIFICA CSRF prima di DELETE
+            if (!csrfToken) {
+                 showFlashMessage('Errore di sicurezza: CSRF token mancante. Impossibile eliminare.', 'danger');
+                 return;
+            }
+
             try {
                 const response = await fetch(`${DOMANDA_API_URL}${id}`, { 
                     method: 'DELETE',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken
+                        'X-CSRFToken': csrfToken // ✅ INVIO DEL TOKEN NELL'HEADER
                     }
                 });
                 const result = await response.json();
@@ -626,7 +375,90 @@
                 showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
             }
         }
-        
+
+
+        // --- GESTIONE SUBMIT FORM (POST/PUT) ---
+
+        domandaForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            // ✅ VERIFICA CSRF prima di POST/PUT
+            if (!csrfToken) {
+                showFlashMessage('Errore di sicurezza: CSRF token mancante. Impossibile salvare.', 'danger');
+                return;
+            }
+
+            const isEdit = !!domandaIdInput.value;
+            const id = domandaIdInput.value;
+            
+            const descrValue = descrInput.value.trim();
+            const idDriverValue = idDriverSelect.value;
+            // Un campo vuoto per il Gruppo Risposta deve essere inviato come null/undefined, non come stringa vuota '""'
+            const idGruppoRispostaValue = idGruppoRispostaSelect.value || null; 
+
+            // Validazione minima
+            if (!descrValue || !idDriverValue) {
+                showFlashMessage('Testo Domanda e Driver sono campi obbligatori.', 'warning');
+                return;
+            }
+
+            const url = isEdit ? `${DOMANDA_API_URL}${id}` : DOMANDA_API_URL;
+            const method = isEdit ? 'PUT' : 'POST';
+            
+            const bodyData = {
+                descr: descrValue,
+                id_driver: parseInt(idDriverValue),
+                // Invia null se il valore è vuoto
+                id_gruppo_risposta: idGruppoRispostaValue ? parseInt(idGruppoRispostaValue) : null 
+            };
+            
+            const successMessage = isEdit ? 'Domanda modificata con successo.' : 'Domanda aggiunta con successo.';
+            const errorMessage = isEdit ? 'Errore nella modifica della domanda' : 'Errore nell\'aggiunta della domanda';
+
+
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken // ✅ INVIO DEL TOKEN NELL'HEADER
+                    },
+                    body: JSON.stringify(bodyData)
+                });
+                
+                const result = await response.json();
+
+                if (response.ok) {
+                    showFlashMessage(successMessage, 'success'); 
+                    domandaForm.reset();
+                    domandaIdInput.value = '';
+                    // ✅ CORREZIONE AGGIUNTIVA: Assicura che i dropdown tornino al default
+                    idDriverSelect.value = '';
+                    idGruppoRispostaSelect.value = '';
+                    loadDomande();
+                } else {
+                    // Gestione degli errori, inclusi 400 (Bad Request)
+                    showFlashMessage(`${errorMessage}: ${result.error || response.statusText}`, 'danger');
+                }
+            } catch (error) {
+                console.error("Errore nella richiesta API (catch block):", error);
+                showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
+            }
+        });
+
+
+        // --- GESTIONE RESET ---\
+        resetFormBtn.addEventListener('click', () => {
+            console.log("Resetting domanda form.");
+            domandaForm.reset();
+            domandaIdInput.value = '';
+            // ✅ CORREZIONE AGGIUNTIVA: Resetta esplicitamente i dropdown al valore di default
+            idDriverSelect.value = '';
+            idGruppoRispostaSelect.value = '';
+        });
+
+
+        // --- CARICAMENTO INIZIALE E LISTENERS ---\
         // Carica i driver e i gruppi risposta, e poi le domande
         Promise.all([
             loadDriversForDropdowns(), 
@@ -635,7 +467,7 @@
             loadDomande();
             if (filterDriverSelect) {
                 filterDriverSelect.addEventListener('change', function() {
-                    console.log("Evento 'change' sul filtro Driver rilevato.");
+                    console.log("Evento 'change' sul filtro Driver rilevato. Ricaricamento domande.");
                     loadDomande();
                 });
             }

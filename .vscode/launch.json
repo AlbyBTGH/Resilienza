@@ -1,0 +1,13 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Avvio Diretto server.py",
+            "type": "python",
+            "request": "launch",
+            "program": "BackEnd/server.py", 
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}

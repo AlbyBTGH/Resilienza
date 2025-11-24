@@ -23,65 +23,60 @@ class Repository_t_ambito:
             session.close()
 
     def get_all(self):
-        """Recupera tutti gli ambiti e li restituisce come lista di dizionari."""
-        session = self.Session()
-        try:
-            ambiti_db = session.query(TAmbito).all()
-            ambiti_data = []
-            for ambito in ambiti_db:
-                ambiti_data.append({
-                    'id': ambito.id,
-                    'codice': ambito.codice,
-                    # NOTE: utilizziamo 'descr' per essere compatibili con il JS della pagina progetti.html
-                    'descr': ambito.descrizione if hasattr(ambito, 'descrizione') else getattr(ambito, 'descrizione', None) or ambito.descrizione if False else ambito.descrizione if False else ambito.descrizione if False else ambito.descrizione,
-                    # The above messy fallback is to guard against attribute naming; but below we standardize:
-                    # safer direct mapping:
-                })
-            # The above block used an awkward fallback; instead, rebuild properly:
-            ambiti_data = []
-            for ambito in ambiti_db:
-                # some ORM models use attribute 'descrizione' (if class differs); our Domain_t_ambito uses 'descrizione' attribute name
-                descr_val = getattr(ambito, 'descrizione', None)
-                if descr_val is None:
-                    # maybe attribute name is 'descr' in other models; try that
-                    descr_val = getattr(ambito, 'descr', None)
-                ambiti_data.append({
-                    'id': ambito.id,
-                    'codice': ambito.codice,
-                    'descr': descr_val,
-                    'note': ambito.note,
-                    'data_ultima_modifica': ambito.data_ultima_modifica.isoformat() if ambito.data_ultima_modifica else None,
-                    'modificato_da': ambito.modificato_da
-                })
-            logging.info(f"Recuperati {len(ambiti_data)} ambiti (come dizionari).")
-            return ambiti_data
-        except SQLAlchemyError as e:
-            logging.error(f"Errore nel recupero di tutti gli ambiti: {str(e)}")
-            raise
-        finally:
-            session.close()
+            """Recupera tutti gli ambiti e li restituisce come lista di dizionari."""
+            session = self.Session()
+            try:
+                # Esegue la query per recuperare tutti gli oggetti TAmbito
+                ambiti_db = session.query(TAmbito).all()
+                ambiti_data = []
+                
+                for ambito in ambiti_db:
+                    # Conversione sicura della data in formato ISO per JSON
+                    data_modifica = ambito.data_ultima_modifica.isoformat() if ambito.data_ultima_modifica else None
+                    
+                    ambiti_data.append({
+                        'id': ambito.id,
+                        'codice': ambito.codice,
+                        'descrizione': ambito.descrizione, # Chiave usata nel JSON (descr)
+                        'note': ambito.note,
+                        'data_ultima_modifica': data_modifica,
+                        'modificato_da': ambito.modificato_da
+                    })
+                logging.info(f"Recuperati {len(ambiti_data)} ambiti (come dizionari).")
+                return ambiti_data
+                
+            except SQLAlchemyError as e:
+                # Gestione errori del database
+                logging.error(f"Errore SQLAlchemy nel recupero di tutti gli ambiti: {str(e)}")
+                raise # Rilancia l'errore
+            except Exception as e:
+                # Cattura errori generici (es. problemi di import o sintassi)
+                logging.error(f"Errore generico nel recupero di tutti gli ambiti: {str(e)}")
+                raise # Rilancia l'errore
+            finally:
+                session.close() # Chiusura sicura della sessione
 
     def get_by_id(self, ambito_id: int):
-        """Recupera un ambito tramite ID e lo restituisce come dizionario."""
-        session = self.Session()
-        try:
-            ambito = session.query(TAmbito).filter_by(id=ambito_id).first()
-            if ambito:
-                descr_val = getattr(ambito, 'descrizione', None) or getattr(ambito, 'descr', None)
-                return {
-                    'id': ambito.id,
-                    'codice': ambito.codice,
-                    'descr': descr_val,
-                    'note': ambito.note,
-                    'data_ultima_modifica': ambito.data_ultima_modifica.isoformat() if ambito.data_ultima_modifica else None,
-                    'modificato_da': ambito.modificato_da
-                }
-            return None
-        except SQLAlchemyError as e:
-            logging.error(f"Errore nel recupero ambito {ambito_id}: {str(e)}")
-            raise
-        finally:
-            session.close()
+            """Recupera un ambito tramite ID e lo restituisce come dizionario."""
+            session = self.Session()
+            try:
+                ambito = session.query(TAmbito).filter_by(id=ambito_id).first()
+                if ambito:
+                    descr_val = ambito.descrizione
+                    return {
+                        'id': ambito.id,
+                        'codice': ambito.codice,
+                        'descrizione': descr_val,
+                        'note': ambito.note,
+                        'data_ultima_modifica': ambito.data_ultima_modifica.isoformat() if ambito.data_ultima_modifica else None,
+                        'modificato_da': ambito.modificato_da
+                    }
+                return None
+            except SQLAlchemyError as e: # <-- AGGIUNGI QUESTO BLOCCO
+                logging.error(f"Errore nel recupero dell'ambito {ambito_id} per ID: {str(e)}")
+                raise
+            finally: # <-- AGGIUNGI QUESTO BLOCCO
+                session.close()
 
     def get_by_codice(self, codice: str):
         """Recupera un ambito tramite codice."""

@@ -180,7 +180,8 @@
             try {
                 let url = API_URL_DOMANDE;
                 if (driverId && driverId !== 'all') {
-                    url += `?id_driver=${driverId}`;
+                    // url += `?id_driver=${driverId}`;
+                    url += `?id_driver_filter=${driverId}`;
                 }
 
                 const response = await fetch(url);
@@ -216,7 +217,7 @@
                 row.innerHTML = `
                     <td>${domanda.id}</td>
                     <td>${domanda.descr}</td>
-                    <td>${domanda.driver_descr || 'N/A'}</td>
+                    <td>${domanda.descr_driver || 'N/A'}</td>
                     <td>
                         <button type="button" class="btn btn-sm btn-success aggiungi-domanda" data-id="${domanda.id}">
                             <i class="fas fa-plus"></i>

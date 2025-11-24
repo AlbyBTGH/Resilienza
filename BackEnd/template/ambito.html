@@ -204,14 +204,14 @@
             let method = 'POST';
             let successMessage = 'Operazione effettuata correttamente'; 
             let errorMessage = 'Errore nella creazione dell\'ambito.';
-            let bodyData = { codice: codice, descrizione: descrizione, note: note };
+            let bodyData = { codice: codice, descr: descrizione, note: note };
 
             if (id) {
                 url = `${API_URL}${id}`;
                 method = 'PUT';
                 successMessage = 'Operazione effettuata correttamente'; 
                 errorMessage = 'Errore nell\'aggiornamento dell\'ambito.';
-                bodyData = { descrizione: descrizione, note: note };
+                bodyData = { descr: descrizione, note: note };
             }
             console.log(`Invio richiesta ${method} a ${url} con dati:`, bodyData);
 

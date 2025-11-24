@@ -111,6 +111,9 @@ from Classi.ClasseProgettoQuestionario.Service_progetto_questionario import Serv
 from Classi.ClasseRisposteCliente.Service_risposta_cliente import ServiceRispostaCliente
 from Classi.ClasseRisposteCliente.Controller_risposta_cliente import risposta_cliente_controller
 
+from Classi.ClassePunteggi.Service_progetto_questionario_punteggio import ServiceProgettoQuestionarioPunteggio
+from Classi.ClassePunteggi.Controller_progetto_questionario_punteggio import punteggio_controller
+
 # Inizializzazione del logging
 logging.basicConfig(level=logging.INFO)
 
@@ -142,6 +145,8 @@ service_t_risposta = Service_t_risposta()
 service_t_risposta.create_table_if_not_exists()
 
 service_risposta_cliente = ServiceRispostaCliente()
+
+service_punteggi = ServiceProgettoQuestionarioPunteggio()
 
 
 # Definisci la classe del form di login
@@ -1456,6 +1461,8 @@ if __name__ == '__main__':
     print("DEBUG: Registrando risposta_cliente_controller con prefisso /api/risposta_cliente")
     # Il prefisso /api/risposta_cliente è corretto, dato che la rotta nel Controller è /salva_risposte_massive
     app.register_blueprint(risposta_cliente_controller)
+
+    app.register_blueprint(punteggio_controller)
     
     print("DEBUG: Registrando la rotta di upload 'upload_domande' con prefisso /api/domande/upload")
     app.add_url_rule('/api/domande/upload', 'upload_domande', upload_domande, methods=['POST'])

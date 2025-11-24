@@ -1,0 +1,91 @@
+{# File: modal_correttiva.html (Aggiornato con titoli modificati e stilizzati) #}
+<div class="modal fade" id="correttivaModal" tabindex="-1" aria-labelledby="correttivaModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="correttivaModalLabel">Gestione Azioni Correttive</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Domanda Correlata: <strong id="domandaCorrelataTesto"></strong></p>
+                
+                <hr>
+                
+                {# ========================================================= #}
+                {# 🟢 SEZIONE 1: FORM DI CREAZIONE (IN ALTO) #}
+                {# ========================================================= #}
+                
+                <h4 class="text-primary fw-bold mb-3"><i class="bi bi-plus-circle-fill me-2"></i> Inserisci Nuova Correttiva</h4> 
+                
+                <form id="correttivaForm">
+                    <input type="hidden" id="modalIdPqd" name="id_progetto_questionario_domanda">
+                    <div class="mb-3">
+                        <label for="descrizioneCorrettiva" class="form-label fw-bold">Descrizione Azione Correttiva *</label>
+                        <textarea class="form-control" id="descrizioneCorrettiva" name="descrizione_correttiva" rows="3" required></textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="responsabile" class="form-label">Responsabile</label>
+                            <input type="text" class="form-control" id="responsabile" name="responsabile">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="dataScadenza" class="form-label fw-bold">Data Scadenza *</label>
+                            <input type="date" class="form-control" id="dataScadenza" name="data_scadenza" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="statoCorrettiva" class="form-label fw-bold">Stato *</label>
+                            <select class="form-select" id="statoCorrettiva" name="stato" required>
+                                <option value="Aperta" selected>Aperta</option>
+                                <option value="In Corso">In Corso</option>
+                                <option value="Completata">Completata</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Annullata">Annullata</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 d-flex align-items-center">
+                        <label class="form-label me-3 mb-0">Comporta un costo?</label>
+                        <div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="costo" id="costoSi" value="true">
+                                <label class="form-check-label" for="costoSi">SÌ</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="costo" id="costoNo" value="false" checked>
+                                <label class="form-check-label" for="costoNo">NO</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="noteCorrettiva" class="form-label">Note</label>
+                        <textarea class="form-control" id="noteCorrettiva" name="note" rows="2"></textarea>
+                    </div>
+
+                    <div id="modalMessageContainer"></div>
+                </form>
+
+                <hr>
+
+                {# ========================================================= #}
+                {# 🟠 SEZIONE 2: LISTA CORRETTIVE ESISTENTI (IN BASSO) #}
+                {# ========================================================= #}
+                
+                <h4 class="text-primary fw-bold mb-3"><i class="bi bi-list-columns-reverse me-2"></i> Storico Correttive</h4>
+                
+                <div id="correttiveListContainer" class="mb-2">
+                    <div class="text-center text-muted p-3">Caricamento correttive...</div>
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+                <button type="submit" class="btn btn-primary" id="salvaCorrettivaBtn" form="correttivaForm">
+                    <i class="bi bi-gear"></i> Salva Nuova Correttiva
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

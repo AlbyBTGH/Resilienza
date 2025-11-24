@@ -538,8 +538,10 @@ function salvaNuovaCorrettiva() {
         descrizione_correttiva: formData.get('descrizione_correttiva'),
         responsabile: formData.get('responsabile') || null,
         data_scadenza: formData.get('data_scadenza'),
+        // NUOVI CAMPI AGGIUNTI
         data_effettiva_intervento: formData.get('data_effettiva_intervento') || null, 
         stato: formData.get('stato'), // È sempre presente grazie a 'selected' nel form
+        // FINE NUOVI CAMPI
         costo: formData.get('costo') === 'true', 
         note: formData.get('note') || null
     };
@@ -692,24 +694,17 @@ function renderCorrettiveList(correttive) {
             statoClass = 'bg-light text-muted';
         }
         
-        // Visualizza fino a 75 caratteri della descrizione
+        // ⭐ NUOVA LOGICA: Visualizza fino a 75 caratteri della descrizione
         const DESCRIZIONE_LIMIT = 75;
         const descrizioneTroncata = c.descrizione_correttiva.length > DESCRIZIONE_LIMIT
             ? c.descrizione_correttiva.substring(0, DESCRIZIONE_LIMIT - 3) + '...' 
             : c.descrizione_correttiva;
             
-        // COLONNA NOTE
+        // Visualizza fino a 50 caratteri delle Note
         const NOTE_LIMIT = 50;
-        const noteContent = c.note; // Legge il contenuto raw dal JSON
-
-        let noteTroncate;
-        if (!noteContent) { // Cattura null, undefined o stringa vuota ('')
-            noteTroncate = 'N.D.'; 
-        } else if (noteContent.length > NOTE_LIMIT) {
-            noteTroncate = noteContent.substring(0, NOTE_LIMIT - 3) + '...'; 
-        } else {
-            noteTroncate = noteContent; 
-        }
+        const noteTroncate = (c.note || '').length > NOTE_LIMIT
+            ? c.note.substring(0, NOTE_LIMIT - 3) + '...'
+            : (c.note || 'N.D.'); // 'N.D.' se la nota è vuota
         
         // Formatta la data (rimuove l'ora)
         const dataInserimentoBreve = c.data_inserimento ? c.data_inserimento.split(' ')[0] : 'N.D.';
@@ -725,8 +720,8 @@ function renderCorrettiveList(correttive) {
         html += `<td class="${statoClass} text-center">${c.stato}</td>`;
         // Colonna Costo
         html += `<td class="text-center ${costoClass}">${costoTesto}</td>`; 
-        // Colonna Note
-        html += `<td title="${c.note || ''}">${noteTroncate}</td>`;
+        // Colonna Note (NUOVA)
+        html += `<td title="${c.note || ''}">${noteTroncate}</td>`; 
         // Colonna Scadenza
         html += `<td>${c.data_scadenza || 'N.D.'}</td>`;
         // Colonna Responsabile
