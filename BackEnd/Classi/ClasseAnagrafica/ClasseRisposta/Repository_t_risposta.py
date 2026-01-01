@@ -46,36 +46,44 @@ class Repository_t_risposta:
         finally:
             session.close()
 
-    def create(self, descr: str, gruppi_risposta_ids: list[int], peso: float):
+    def create(self, descr: str, gruppi_risposta_ids: list, peso: float, modificato_da: str):
         session = self.Session()
         try:
-            nuova_risposta = TRisposta(
+            # 1. Crea l'oggetto Risposta (senza le relazioni inizialmente)
+            risposta = TRisposta(
                 descr=descr,
                 peso=peso,
+                modificato_da=modificato_da,
+                data_ultima_modifica=datetime.now()
             )
+            session.add(risposta)
+            # NOTA: Non chiamiamo commit qui.
 
-            # Aggiunge la nuova risposta alla sessione
-            session.add(nuova_risposta)
-            session.commit()
-            session.refresh(nuova_risposta)
-
-            # Associa i gruppi di risposta
+            # 2. Associa i Gruppi (CRUCIALE per Many-to-Many)
             if gruppi_risposta_ids:
-                gruppi = session.query(TGruppoRisposta).filter(TGruppoRisposta.id.in_(gruppi_risposta_ids)).all()
-                nuova_risposta.gruppi_risposta.extend(gruppi)
-                session.commit()
-                session.refresh(nuova_risposta)
+                # Carica gli oggetti TGruppoRisposta esistenti che corrispondono agli ID
+                # forniti dal frontend.
+                gruppi = session.query(TGruppoRisposta).filter(
+                    TGruppoRisposta.id.in_(gruppi_risposta_ids)
+                ).all()
 
-            # Carica in modo anticipato la relazione prima di restituire l'oggetto
-            nuova_risposta_con_gruppi = session.query(TRisposta).options(
-                joinedload(TRisposta.gruppi_risposta)
-            ).filter_by(id=nuova_risposta.id).one_or_none()
-
-            logging.info(f"Risposta con ID {nuova_risposta_con_gruppi.id} creata con successo.")
-            return nuova_risposta_con_gruppi
+                # Associa gli oggetti TGruppoRisposta alla collezione della risposta.
+                # SQLAlchemy gestirà l'inserimento nella tabella di associazione.
+                risposta.gruppi_risposta.extend(gruppi)
+                
+            # 3. Commit finale: salva sia la Risposta che le sue associazioni.
+            session.commit()
+            
+            # 4. Ricarica per garantire il corretto caricamento delle relazioni (Lazy Loading)
+            session.refresh(risposta) 
+            loaded_risposta = session.query(TRisposta).options(joinedload(TRisposta.gruppi_risposta)).filter_by(id=risposta.id).first()
+            
+            logging.info(f"Risposta {loaded_risposta.id} creata e associata ai gruppi.")
+            return loaded_risposta
+            
         except SQLAlchemyError as e:
             session.rollback()
-            logging.error(f"Errore nella creazione della risposta: {str(e)}")
+            logging.error(f"Errore nella creazione della risposta e associazione: {str(e)}")
             raise
         finally:
             session.close()

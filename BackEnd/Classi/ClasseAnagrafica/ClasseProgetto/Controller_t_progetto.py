@@ -67,6 +67,44 @@ def create_progetto():
     return jsonify(result_obj), status_code
 
 
+@t_progetto_controller.route("/<int:progetto_id>/progetto_analisti", methods=['PUT'])
+def sync_progetto_analisti(progetto_id):
+    """
+    Gestisce la sincronizzazione della lista di analisti associati a un progetto.
+    Utilizza il nuovo endpoint /<id>/progetto_analisti.
+    """
+    try:
+        # 1. Recupera i dati dalla richiesta
+        data = request.get_json()
+        
+        # 2. Estrazione e Validazione input
+        analisti_ids = data.get('analisti_ids', [])
+        # Recupera l'utente che effettua la modifica dalla sessione/token
+        modificato_da = session.get('username', 'Sistema') 
+
+        if not modificato_da:
+             return jsonify({"error": "Impossibile identificare l'utente modificante. Sessione scaduta?"}), 401
+
+        # Assicurati che analisti_ids sia una lista di interi
+        if not isinstance(analisti_ids, list):
+            return jsonify({"error": "Il campo 'analisti_ids' deve essere una lista di ID interi."}), 400
+            
+        # 3. Chiama il Service per eseguire la sincronizzazione
+        response, status_code = service_t_progetto.sync_analisti_progetto(
+            progetto_id=progetto_id,
+            analisti_ids=analisti_ids,
+            modificato_da=modificato_da
+        )
+
+        return jsonify(response), status_code
+
+    except Exception as e:
+        import logging
+        logging.error(f"Errore nel Controller sync_progetto_analisti per ID {progetto_id}: {str(e)}")
+        # Restituisce un errore 500 generico per evitare di esporre dettagli di implementazione
+        return jsonify({"error": f"Errore interno del server durante la sincronizzazione degli analisti."}), 500
+
+
 @t_progetto_controller.route("/<int:progetto_id>", methods=['PUT'])
 def update_progetto(progetto_id):
     data = request.json

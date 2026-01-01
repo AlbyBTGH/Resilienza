@@ -1,6 +1,6 @@
-{# File: modal_correttiva.html (Aggiornato con Form sopra Lista) #}
+{# File: modal_correttiva.html (Aggiornato con titoli modificati e stilizzati) #}
 <div class="modal fade" id="correttivaModal" tabindex="-1" aria-labelledby="correttivaModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl"> {# Modificato a modal-lg #}
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header bg-warning text-dark">
                 <h5 class="modal-title" id="correttivaModalLabel">Gestione Azioni Correttive</h5>
@@ -12,12 +12,13 @@
                 <hr>
                 
                 {# ========================================================= #}
-                {# SEZIONE 1: FORM DI CREAZIONE (IN ALTO) #}
+                {# 🟢 SEZIONE 1: FORM DI CREAZIONE (IN ALTO) #}
                 {# ========================================================= #}
-                <h6>Crea Nuova Azione Correttiva</h6>
+                
+                <h4 class="text-primary fw-bold mb-3"><i class="bi bi-plus-circle-fill me-2"></i> Inserisci Nuova Correttiva</h4> 
+                
                 <form id="correttivaForm">
                     <input type="hidden" id="modalIdPqd" name="id_progetto_questionario_domanda">
-                    
                     <div class="mb-3">
                         <label for="descrizioneCorrettiva" class="form-label fw-bold">Descrizione Azione Correttiva *</label>
                         <textarea class="form-control" id="descrizioneCorrettiva" name="descrizione_correttiva" rows="3" required></textarea>
@@ -69,9 +70,11 @@
                 <hr>
 
                 {# ========================================================= #}
-                {# SEZIONE 2: LISTA CORRETTIVE ESISTENTI (IN BASSO) #}
+                {# 🟠 SEZIONE 2: LISTA CORRETTIVE ESISTENTI (IN BASSO) #}
                 {# ========================================================= #}
-                <h6>Storico Azioni Correttive</h6>
+                
+                <h4 class="text-primary fw-bold mb-3"><i class="bi bi-list-columns-reverse me-2"></i> Storico Correttive</h4>
+                
                 <div id="correttiveListContainer" class="mb-2">
                     <div class="text-center text-muted p-3">Caricamento correttive...</div>
                 </div>

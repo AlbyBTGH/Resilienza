@@ -4,6 +4,7 @@ import pprint
 import logging
 import pandas as pd
 import io
+import sys
 from datetime import datetime, date
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -114,6 +115,9 @@ from Classi.ClasseRisposteCliente.Controller_risposta_cliente import risposta_cl
 from Classi.ClassePunteggi.Service_progetto_questionario_punteggio import ServiceProgettoQuestionarioPunteggio
 from Classi.ClassePunteggi.Controller_progetto_questionario_punteggio import punteggio_controller
 
+from Classi.ClasseCorrettive.Service_correttiva import ServiceCorrettiva 
+from Classi.ClasseCorrettive.Controller_correttiva import correttiva_controller
+
 # Inizializzazione del logging
 logging.basicConfig(level=logging.INFO)
 
@@ -147,6 +151,7 @@ service_t_risposta.create_table_if_not_exists()
 service_risposta_cliente = ServiceRispostaCliente()
 
 service_punteggi = ServiceProgettoQuestionarioPunteggio()
+sys.modules[__name__].service_punteggi = service_punteggi
 
 
 # Definisci la classe del form di login
@@ -1463,6 +1468,8 @@ if __name__ == '__main__':
     app.register_blueprint(risposta_cliente_controller)
 
     app.register_blueprint(punteggio_controller)
+
+    app.register_blueprint(correttiva_controller)
     
     print("DEBUG: Registrando la rotta di upload 'upload_domande' con prefisso /api/domande/upload")
     app.add_url_rule('/api/domande/upload', 'upload_domande', upload_domande, methods=['POST'])

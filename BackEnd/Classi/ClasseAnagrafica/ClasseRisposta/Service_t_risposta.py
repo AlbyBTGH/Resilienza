@@ -34,14 +34,34 @@ class Service_t_risposta:
             'data_ultima_modifica': risposta.data_ultima_modifica.isoformat() if isinstance(risposta.data_ultima_modifica, datetime) else str(risposta.data_ultima_modifica)
         }
 
+    def _get_sort_key(self, risposta_dict):
+        """Restituisce il primo gruppo (o stringa vuota) per l'ordinamento alfabetico."""
+        # Recupera la lista delle descrizioni dei gruppi
+        gruppi = risposta_dict.get('gruppi_risposta_descr')
+        
+        # Se la lista esiste e non è vuota, usa il primo elemento per l'ordinamento
+        if gruppi and isinstance(gruppi, list) and len(gruppi) > 0:
+            return gruppi[0]
+        
+        # Le risposte senza gruppo avranno un valore di ordinamento vuoto
+        return ''
+
     def get_all_risposte(self):
         """
-        Recupera tutte le risposte dal database e le formatta per l'API.
+        Recupera tutte le risposte dal database, le ordina per la descrizione del gruppo
+        (lato Python) e le formatta per l'API.
         """
         try:
-            risposte = self.repository.get_all()
-            risposte_formattate = [self._to_dict(r) for r in risposte]
-            logging.info(f"Recuperate {len(risposte_formattate)} risposte.")
+            # 1. Recupera i dati dal repository (la query ORM è la versione stabile)
+            risposte_obj = self.repository.get_all()
+            
+            # 2. Converte in dizionari
+            risposte_formattate = [self._to_dict(r) for r in risposte_obj if r is not None]
+
+            # 3. ORDINA LATO PYTHON per 'Gruppo(i)' (il primo gruppo descritto), case-insensitive
+            risposte_formattate.sort(key=lambda r: self._get_sort_key(r).lower())
+
+            logging.info(f"Recuperate e ordinate {len(risposte_formattate)} risposte.")
             return risposte_formattate
         except Exception as e:
             logging.error(f"Errore nel servizio durante il recupero di tutte le risposte: {str(e)}")
@@ -57,7 +77,7 @@ class Service_t_risposta:
             logging.error(f"Errore nel servizio durante il recupero della risposta con ID {risposta_id}: {str(e)}")
             return None
 
-    def create_risposta(self, descr: str, gruppi_risposta_ids: list[int], peso: float):
+    def create_risposta(self, descr: str, gruppi_risposta_ids: list[int], peso: float, modificato_da: str):
         """
         Crea una nuova risposta dopo aver validato i dati.
         """
@@ -65,7 +85,7 @@ class Service_t_risposta:
             if not self.gruppo_repository.check_gruppi_risposta_exist(gruppi_risposta_ids):
                 return {"error": "Uno o più gruppi di risposta forniti non esistono."}, 400
 
-            new_risposta = self.repository.create(descr, gruppi_risposta_ids, peso)
+            new_risposta = self.repository.create(descr, gruppi_risposta_ids, peso, modificato_da)
             
             if new_risposta:
                 logging.info(f"Risposta con ID {new_risposta.id} creata con successo.")

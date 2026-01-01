@@ -110,10 +110,19 @@
         </div>
     </div>
 </div>
+{% include 'analisti_modal.html' %}
 {% endblock content %}
 
 {% block scripts %}
 <script>
+// Variabili globali per la Modal Analisti
+let allAnalisti = []; // Cache per gli analisti caricati dal backend
+const analistiModal = new bootstrap.Modal(document.getElementById('analistiModal'));
+const analistiChecklist = document.getElementById('analistiChecklist');
+const analistiProgettoDescr = document.getElementById('analistiProgettoDescr');
+const analistiProgettoId = document.getElementById('analistiProgettoId');
+const btnSalvaAnalisti = document.getElementById('btnSalvaAnalisti');
+
 const PROGETTI_API_URL = "{{ url_for('progetto.get_all_progetti') }}";
 const CLIENTI_API_URL = "{{ url_for('cliente.get_all_clienti') }}";
 const PROGETTO_API_BASE_URL = "/api/progetto/";
@@ -129,6 +138,151 @@ const csrfToken = document.getElementById('csrf_token').value;
 let allProgetti = [], filteredProgetti = [];
 let currentPage = 1;
 const pageSize = 5;
+
+// Funzione per Caricare tutti gli Analisti (GET /api/utenti/analisti)
+async function loadAnalisti() {
+    try {
+        const response = await fetch('/api/utenti/analisti'); 
+        if (!response.ok) throw new Error('Errore nel recupero degli analisti disponibili.');
+        
+        // allAnalisti deve contenere [{id: N, nome: 'X', cognome: 'Y'}, ...]
+        allAnalisti = await response.json();
+        
+        
+    } catch (error) {
+        console.error("Errore nel caricamento degli analisti:", error);
+        showAlert("Impossibile caricare la lista degli analisti dal server.", 'danger');
+        allAnalisti = []; 
+    }
+}
+
+// Funzione per gestire l'apertura della Modal Analisti
+async function handleAssociateAnalisti(progettoId) {
+    // ⭐ 1. Controlla e carica la lista completa degli analisti (solo se non è già caricata)
+    if (allAnalisti.length === 0) {
+        // ASSUMIAMO che loadAnalisti() faccia il fetch di /api/utenti/analisti e popoli allAnalisti
+        // Se loadAnalisti non esiste, dovresti implementare qui il fetch di tutti gli analisti.
+        await loadAnalisti(); 
+        if (allAnalisti.length === 0) {
+            analistiChecklist.innerHTML = `<p class="text-muted">Nessun utente con ruolo 'Analista' trovato.</p>`;
+            analistiModal.show();
+            return;
+        }
+    }
+
+    // Pulisci la checklist ad ogni apertura
+    analistiChecklist.innerHTML = '';
+    
+    // Identifica il progetto
+    analistiProgettoId.value = progettoId;
+
+    // ⭐ 2. CHIAMA L'ENDPOINT PER RECUPERARE L'ANALISTA ATTIVI
+    try {
+        const responseProgetto = await fetch(`/api/progetto/${progettoId}`);
+        const progetto = await responseProgetto.json();
+
+        if (!responseProgetto.ok) {
+            showAlert(progetto.error || "Errore nel recupero dei dettagli del progetto.", 'danger');
+            return;
+        }
+
+        // Popola l'intestazione della Modal con la descrizione aggiornata
+        analistiProgettoDescr.textContent = progetto.descr;
+
+        // Lista degli ID analisti attivi dal backend (es. [101, 105, 112])
+        const analistiAttivi = progetto.analisti_attivi_ids || []; 
+
+        // ⭐ 3. POPOLA E SPUNTA I CHECKBOX
+        allAnalisti.forEach(analista => {
+            // Verifica se l'ID dell'analista è presente nella lista degli analisti attivi
+            const isChecked = analistiAttivi.includes(analista.id); 
+
+            const analistaHtml = `
+                <div class="form-check">
+                    <input class="form-check-input analista-checkbox" type="checkbox" 
+                           value="${analista.id}" 
+                           id="analista-${analista.id}"
+                           ${isChecked ? 'checked' : ''}> <label class="form-check-label" for="analista-${analista.id}">
+                        ${analista.nome} ${analista.cognome}
+                    </label>
+                </div>
+            `;
+            analistiChecklist.innerHTML += analistaHtml;
+        });
+
+    } catch (error) {
+        console.error('Errore durante il caricamento delle associazioni:', error);
+        showAlert('Errore di comunicazione con il server.', 'danger');
+        return;
+    }
+
+    // Mostra la Modal
+    analistiModal.show();
+}
+
+// Funzione per gestire l'invio dei dati di associazione
+async function handleSalvaAssociazioni() {
+    const progettoId = analistiProgettoId.value;
+    const analistiSelezionati = [];
+    
+    // Raccogli gli ID degli analisti con il checkbox selezionato
+    const checkboxes = analistiChecklist.querySelectorAll('.analista-checkbox:checked');
+    checkboxes.forEach(checkbox => {
+        analistiSelezionati.push(parseInt(checkbox.value));
+    });
+
+    if (!progettoId) {
+        return showAlert("Errore: ID Progetto mancante.", 'danger');
+    }
+
+    // Costruisci il payload da inviare al backend
+    const payload = {
+        analisti_ids: analistiSelezionati,
+        // Non è necessario inviare il progettoId nel body se lo usiamo nella URL
+        // ma è utile per chiarezza: progetto_id: parseInt(progettoId), 
+        modificato_da: 'UtenteLoggato' // Sostituisci con la vera variabile utente loggato, se disponibile
+    };
+    
+    // Disabilita il bottone per evitare doppi click
+    btnSalvaAnalisti.disabled = true;
+
+    try {
+        // ⭐ NUOVO ENDPOINT PUT: Associa gli analisti al progetto
+        //const response = await fetch(`/api/progetto/analisti/associa/${progettoId}`, {
+        const response = await fetch(`/api/progetto/${progettoId}/progetto_analisti`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.getElementById('csrf_token').value // Invia il token CSRF
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showAlert(result.message || "Associazioni salvate con successo.", 'success');
+            analistiModal.hide();
+            // Ricarica la tabella principale per aggiornare lo stato (se necessario)
+            loadProgetti(); 
+        } else {
+            showAlert(result.error || "Errore nel salvataggio delle associazioni.", 'danger');
+        }
+
+    } catch (error) {
+        console.error('Errore durante il salvataggio delle associazioni:', error);
+        showAlert('Errore di comunicazione con il server.', 'danger');
+    } finally {
+        btnSalvaAnalisti.disabled = false;
+    }
+}
+
+// Chiama loadAnalisti() 
+loadAnalisti();
+
+if (btnSalvaAnalisti) {
+    btnSalvaAnalisti.addEventListener('click', handleSalvaAssociazioni); // Listener qui
+}
 
 function showAlert(msg, type = 'success') {
     alertBox.innerHTML = `
@@ -167,6 +321,10 @@ function renderTable() {
                     <button class="btn btn-danger btn-sm delete-btn" data-id="${p.id}">
                         <i class="fas fa-trash"></i>
                     </button>
+                    <button class="btn btn-info btn-sm associate-analisti-btn" data-id="${p.id}" title="Associa Analisti">
+                        <i class="fas fa-users"></i>
+                    </button>
+
                 </td>
             </tr>`;
     });
@@ -199,7 +357,7 @@ async function loadAmbiti() {
     const ambiti = await res.json();
     const select = document.getElementById('id_ambito');
     select.innerHTML = '<option value="">Seleziona un ambito</option>';
-    ambiti.forEach(a => select.innerHTML += `<option value="${a.id}">${a.descr}</option>`);
+    ambiti.forEach(a => select.innerHTML += `<option value="${a.id}">${a.descrizione}</option>`);
 }
 
 async function loadStati() {
@@ -278,12 +436,29 @@ document.getElementById('resetForm').addEventListener('click', () => {
 });
 
 // Eventi tabella
+//progettiTableBody.addEventListener('click', e => {
+    //const btn = e.target.closest('button');
+    //if (!btn) return;
+    //const id = btn.dataset.id;
+    //if (btn.classList.contains('edit-btn')) handleEdit(id);
+    //if (btn.classList.contains('delete-btn')) handleDelete(id);
+//});
+
 progettiTableBody.addEventListener('click', e => {
     const btn = e.target.closest('button');
     if (!btn) return;
     const id = btn.dataset.id;
-    if (btn.classList.contains('edit-btn')) handleEdit(id);
-    if (btn.classList.contains('delete-btn')) handleDelete(id);
+    
+    // Controlla il bottone di Modifica
+    if (btn.classList.contains('edit-btn')) {
+        handleEdit(id);
+    // Controlla il bottone di Eliminazione
+    } else if (btn.classList.contains('delete-btn')) {
+        handleDelete(id);
+    // ⭐ NUOVO CONTROLLO: Bottone Associa Analisti
+    } else if (btn.classList.contains('associate-analisti-btn')) { 
+        handleAssociateAnalisti(id); // Chiama la funzione per aprire la Modal
+    }
 });
 
 // Ricerca

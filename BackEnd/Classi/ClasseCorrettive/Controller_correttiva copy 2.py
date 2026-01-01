@@ -136,35 +136,3 @@ def get_correttiva_dettaglio_route(correttiva_id):
     except Exception as e:
         logging.exception(f"Errore nel recupero del dettaglio correttiva ID {correttiva_id}")
         return jsonify({'success': False, 'error': f"Errore server: {str(e)}"}), 500
-    
-# =====================================================================
-# ROTTA: Modifica Correttiva Esistente (POST/PUT)
-# =====================================================================
-@correttiva_controller.route(
-    "/api/correttiva/modifica/<int:id_correttiva>", methods=['POST']
-)
-def modifica_correttiva_route(id_correttiva):
-    dati_correttiva = request.get_json() 
-    
-    # Controllo che genera un 400 se il JSON è malformato/vuoto
-    if not isinstance(dati_correttiva, dict) or not dati_correttiva:
-        return jsonify({'success': False, 'error': 'Dati JSON non validi o mancanti.'}), 400
-    
-    try:
-        service_instance = get_correttiva_service()
-        username = get_username_from_session() # Assumi che questa funzione esista
-        
-        service_instance.modifica_correttiva(
-            id_correttiva=id_correttiva,
-            dati_correttiva=dati_correttiva,
-            nome_utente_autore=username
-        )
-        
-        return jsonify({'success': True, 'message': f'Correttiva ID {id_correttiva} modificata con successo.'}), 200
-
-    except ValueError as e:
-        # Questo intercetta il ValueError sollevato dal service/repository
-        return jsonify({'success': False, 'error': str(e)}), 400
-    except Exception as e:
-        logging.exception(f"Errore nella modifica della correttiva ID {id_correttiva}")
-        return jsonify({'success': False, 'error': f"Errore server generico: {str(e)}"}), 500

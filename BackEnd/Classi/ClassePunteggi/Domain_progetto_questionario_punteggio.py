@@ -1,6 +1,6 @@
 # File: Classi/ClassePunteggi/Domain_progetto_questionario_punteggio.py
 # -*- coding: utf-8 -*-
-from sqlalchemy import Column, Integer, DateTime, ForeignKey, text, Numeric
+from sqlalchemy import Column, Integer, DateTime, ForeignKey, text, Numeric, String # ⭐ CORREZIONE: Aggiunto String
 # Assumendo che Base sia importato dal tuo file di connessione al database
 from Classi.ClasseDB.db_connection import Base 
 
@@ -23,6 +23,9 @@ class ProgettoQuestionarioPunteggio(Base):
     # Campo Dati (il risultato del calcolo)
     peso_totale = Column('PESO_TOTALE', Numeric(10, 2), nullable=False)
     
+    #Colonna VERSIONE
+    versione = Column('VERSIONE', String(10), nullable=False) # 'Baseline' o 'Actual'
+    
     # Campo Data di Chiusura
     data_chiusura = Column('DATA_CHIUSURA', DateTime, 
                            server_default=text('CURRENT_TIMESTAMP'), nullable=True)
@@ -31,4 +34,5 @@ class ProgettoQuestionarioPunteggio(Base):
         return (f"<PQP(id={self.id}, "
                 f"pq_id={self.id_progetto_questionario}, "
                 f"cat_id={self.id_categoria}, "
-                f"peso={self.peso_totale})>")
+                f"peso={self.peso_totale}, "
+                f"versione={self.versione})>")

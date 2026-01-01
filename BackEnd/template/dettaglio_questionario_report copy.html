@@ -53,10 +53,153 @@
 {% block scripts %}
 
 <script>
+
+const CSRF_TOKEN = '{{ csrf_token if csrf_token else "" }}';
 // Variabile globale per tracciare le risposte selezionate (anche quelle non salvate)
 let risposteSelezionate = {};
 // Variabile globale per tracciare i dati del report (stato salvato dal DB)
 let currentReportData = [];
+
+// Recupera la Versione calcolata dal Controller ('Baseline' o 'Actual')
+const VERSIONE_CORRENTE = "{{ versione_corrente }}"; 
+console.log(`Versione corrente da calcolare e salvare: ${VERSIONE_CORRENTE}`);
+
+
+/**
+ * Salva o aggiorna una singola risposta chiamando l'API massiva con un array di un solo elemento.
+ * @param {number} idPqd - ID_PROGETTO_QUESTIONARIO_DOMANDA.
+ * @param {number} idRisposta - ID della risposta selezionata.
+ * @returns {Promise<any>} Promise che si risolve al successo del salvataggio.
+ */
+function salvaSingolaRisposta(idPqd, idRisposta) {
+    const risposteDaSalvare = [{
+        id_progetto_questionario_domanda: idPqd,
+        id_risposta: idRisposta
+    }];
+
+    // Controllo che il token sia disponibile
+    if (!CSRF_TOKEN) {
+        console.error("CSRF Token mancante. Impossibile salvare la risposta.");
+        // Non lanciamo la fetch se sappiamo che fallirà immediatamente
+        return Promise.reject(new Error("CSRF Token mancante."));
+    }
+
+    return fetch('/api/risposta_cliente/salva_risposte_massive', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            // ⭐ INCLUSIONE DEL TOKEN CSRF NELL'HEADER X-CSRFToken
+            'X-CSRFToken': CSRF_TOKEN 
+        },
+        body: JSON.stringify(risposteDaSalvare)
+    })
+    .then(response => {
+        if (!response.ok) {
+            console.error(`Salvataggio Fallito (${response.status} ${response.statusText}).`);
+            throw new Error(`Errore di rete/server (${response.status}) durante il salvataggio.`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (!data.success) {
+            throw new Error(data.error || 'Errore API sconosciuto nel salvataggio.');
+        }
+        return data;
+    })
+    .catch(error => {
+        console.error('Errore nel salvataggio della risposta:', error);
+        // ⭐ Questo messaggio si attiva in caso di fallimento (anche CSRF/400)
+        if (typeof mostraMessaggio === 'function') {
+             mostraMessaggio("Impossibile salvare la risposta. Riprova.", 'alert-danger');
+        }
+        throw error;
+    });
+}
+
+
+/**
+ * Chiama l'API per verificare se ci sono correttive attive ('Aperta', 'In Corso', 'Pending')
+ * per il dato ID domanda (ID_PQD) e mostra un ALERT (non bloccante) se ne trova.
+ */
+function verificaCorrettivaSuRisposta(idPqd) {
+    const checkUrl = `/api/correttiva/check_active/${idPqd}`;
+    
+    fetch(checkUrl)
+        .then(response => {
+            if (!response.ok) {
+                console.error('Errore durante la verifica della correttiva per PQD:', idPqd);
+                return { success: false, is_active: false };
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success && data.is_active) {
+                // ⭐ ALERT NATIVO che stiamo cercando!
+                alert(
+                    "ATTENZIONE: Questa domanda ha una o più Azioni Correttive " +
+                    "Aperte, In Corso o Pending. La modifica della risposta non risolve " +
+                    "automaticamente l'Azione Correttiva. Assicurati che il problema sia stato risolto prima di concludere il questionario."
+                );
+            }
+        })
+        .catch(error => {
+            console.error('Errore di rete/fetch nel check correttiva:', error);
+        });
+}
+
+
+
+// ======================================================================
+// NUOVA FUNZIONE: Esegue la chiamata API per il Calcolo Punteggio (Actual/Baseline)
+// ======================================================================
+function handleCalcolaPunteggioAPI(idProgettoQuestionario) {
+    const btn = document.getElementById('concludiButton');
+    
+    if (btn) {
+        if (!btn.originalHtml) {
+            btn.originalHtml = btn.innerHTML; 
+        }
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Calcolo in corso...';
+    }
+    
+    displayMessage('Risposte salvate. Avvio del calcolo dei punteggi (Baseline o Actual)...', 'info');
+
+    fetch(`/api/punteggio/calcola/${idProgettoQuestionario}`, {
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/json',
+            'X-CSRFToken': CSRF_TOKEN // ⭐ USA LA VARIABILE JS
+        }
+    })
+    .then(response => response.json().then(data => ({ status: response.status, body: data })))
+    .then(({ status, body }) => {
+        if (status === 200 && body.success) {
+            displayMessage(body.message + '. Ricaricamento pagina in corso per visualizzare i nuovi dati.', 'success');
+            
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500); 
+
+        } else {
+            const errorMsg = body.error || `Errore HTTP ${status}: Impossibile calcolare il punteggio.`;
+            displayMessage(`Calcolo fallito: ${errorMsg}`, 'danger');
+            console.error("Errore calcolo punteggio:", body);
+        }
+    })
+    .catch(error => {
+        displayMessage('Errore di rete durante il calcolo del punteggio.', 'danger');
+        console.error('Errore fetch calcolo punteggio:', error);
+    })
+    .finally(() => {
+        // Riabilita il pulsante e ripristina il testo SOLO in caso di fallimento
+        if (btn && btn.disabled) {
+             btn.disabled = false;
+             btn.innerHTML = btn.originalHtml || '<i class="bi bi-check2-circle"></i> Concludi Questionario';
+             fetchDettaglioReport(idProgettoQuestionario);
+        }
+    });
+}
+
 
 document.addEventListener('DOMContentLoaded', function() {
     const idProgettoQuestionario = "{{ id_progetto_questionario }}";
@@ -195,12 +338,31 @@ function fetchDettaglioReport(id) {
 // ======================================================================
 
 function handleRispostaChange(radioElement) {
+    // 1. Lettura degli ID e conversione in numeri interi
     const idAssociazione = parseInt(radioElement.getAttribute('data-id-associazione'));
     const idRisposta = parseInt(radioElement.value);
 
-    risposteSelezionate[idAssociazione] = idRisposta;
+    // 2. Aggiornamento dello stato locale (sincrono)
+    // Assumendo che 'risposteSelezionate' sia definito altrove nel tuo script
+    if (typeof risposteSelezionate !== 'undefined') {
+        risposteSelezionate[idAssociazione] = idRisposta;
+    }
 
     console.log(`Risposta selezionata: Associazione ID ${idAssociazione}, Risposta ID ${idRisposta}`);
+
+    // 3. ⭐ Salvataggio AJAX e Check Correttiva (Asincrono)
+    // Se il salvataggio ha successo, chiamiamo il check della correttiva.
+    salvaSingolaRisposta(idAssociazione, idRisposta)
+        .then(() => {
+            console.log("Risposta salvata con successo. Esecuzione check correttiva...");
+            
+            // ⭐ Se il salvataggio riesce, lanciamo la verifica, che mostrerà l'alert se necessario
+            verificaCorrettivaSuRisposta(idAssociazione);
+        })
+        .catch(error => {
+            // Se c'è un errore nel salvataggio, il catch ferma l'esecuzione del .then()
+            console.warn("Check correttiva interrotto a causa di un errore nel salvataggio della risposta.");
+        });
 }
 
 function renderReport(data) {
@@ -334,14 +496,20 @@ function salvaRisposteMassive(idProgettoQuestionario, triggerConcludi = false) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRFToken': '{{ csrf_token if csrf_token else "" }}' 
+            'X-CSRFToken': CSRF_TOKEN // ⭐ USA LA VARIABILE JS
         },
         body: JSON.stringify(risposteDaSalvare)
     })
+
+
     .then(response => {
         if (!response.ok) {
-            return response.json().then(errorData => {
-                throw new Error(errorData.error || `Errore HTTP: ${response.status}`);
+            // Tentiamo di leggere l'errore JSON anche con status non ok
+            return response.json().catch(() => {
+                // Se non è JSON (es. HTML 400), lanciamo un errore generico
+                throw new Error(`Errore HTTP: ${response.status}. Problema CSRF o Server Error.`);
+            }).then(errorData => {
+                 throw new Error(errorData.error || `Errore HTTP: ${response.status}`);
             });
         }
         return response.json();
@@ -354,17 +522,22 @@ function salvaRisposteMassive(idProgettoQuestionario, triggerConcludi = false) {
         }
 
         if (data.success) {
-            displayMessage(`Salvataggio di ${risposteDaSalvare.length} risposte completato con successo!`, 'success');
             
-            // Ricarica per aggiornare gli indicatori di risposta salvata
-            fetchDettaglioReport(idProgettoQuestionario); 
-            
-            // Se l'utente ha premuto 'Concludi', prosegui con il calcolo del punteggio
             if (triggerConcludi) {
-                concludiQuestionario(idProgettoQuestionario);
+                // Logica di calcolo dei punteggi (Baseline/Actual)
+                handleCalcolaPunteggioAPI(idProgettoQuestionario); 
+                
+            } else {
+                // Se è un semplice "Salva"
+                displayMessage(`Salvataggio di ${risposteDaSalvare.length} risposte completato con successo!`, 'success');
+                fetchDettaglioReport(idProgettoQuestionario); 
             }
-            
+
         } else {
+            // Riabilita il pulsante Concludi Questionario in caso di errore nel salvataggio risposte
+            if (concludiButton) {
+                concludiButton.disabled = false; 
+            }
             displayMessage('ERRORE: ' + (data.error || 'Si è verificato un errore nel salvataggio.'), 'danger');
             console.error('Errore API:', data.error);
         }
@@ -425,6 +598,11 @@ function checkCompletionStatus() {
 function concludiQuestionario(idProgettoQuestionario) {
     const concludiButton = document.getElementById('concludiButton');
 
+    // Creazione del payload con la VERSIONE
+    const payload = {
+        version: VERSIONE_CORRENTE // ⭐ AGGIUNTO IL PAYLOAD DELLA VERSIONE
+    };
+
     // Disabilita il pulsante "Concludi"
     if (concludiButton) { 
         concludiButton.disabled = true;
@@ -437,8 +615,10 @@ function concludiQuestionario(idProgettoQuestionario) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRFToken': '{{ csrf_token if csrf_token else "" }}' 
-        }
+            // CORREZIONE CRITICA PER SINTAX ERROR: Usa | default('') per evitare l'errore 'if' in JS
+            'X-CSRFToken': '{{ csrf_token | default('') }}'
+        },
+        body: JSON.stringify(payload) // ⭐ AGGIUNTO IL BODY
     })
     .then(response => {
         if (!response.ok) {
@@ -456,9 +636,14 @@ function concludiQuestionario(idProgettoQuestionario) {
         }
 
         if (data.success) {
-            displayMessage(`Calcolo punteggio completato! Righe inserite: ${data.risultati.rows_affected}.`, 'success', 8000);
+            // ⭐ MESSAGGIO AGGIORNATO con la versione
+            displayMessage(`Calcolo punteggio ${VERSIONE_CORRENTE} completato! Righe inserite: ${data.risultati.rows_affected}. Ora puoi visualizzare la Dashboard.`, 'success', 8000);
             
-            // ? RIMOZIONE: Eliminata la chiamata fetchAndDrawRadarChart(idProgettoQuestionario);
+            // Abilita il link alla Dashboard (se non è già abilitato)
+            const dashboardLink = document.querySelector('a[href*="dashboard_questionario"]');
+            if (dashboardLink) {
+                dashboardLink.classList.remove('disabled');
+            }
             
         } else {
             displayMessage('ERRORE Calcolo Punteggio: ' + (data.error || 'Si è verificato un errore nel calcolo.'), 'danger');
@@ -538,10 +723,8 @@ function salvaNuovaCorrettiva() {
         descrizione_correttiva: formData.get('descrizione_correttiva'),
         responsabile: formData.get('responsabile') || null,
         data_scadenza: formData.get('data_scadenza'),
-        // NUOVI CAMPI AGGIUNTI
         data_effettiva_intervento: formData.get('data_effettiva_intervento') || null, 
         stato: formData.get('stato'), // È sempre presente grazie a 'selected' nel form
-        // FINE NUOVI CAMPI
         costo: formData.get('costo') === 'true', 
         note: formData.get('note') || null
     };
@@ -694,17 +877,24 @@ function renderCorrettiveList(correttive) {
             statoClass = 'bg-light text-muted';
         }
         
-        // ⭐ NUOVA LOGICA: Visualizza fino a 75 caratteri della descrizione
+        // Visualizza fino a 75 caratteri della descrizione
         const DESCRIZIONE_LIMIT = 75;
         const descrizioneTroncata = c.descrizione_correttiva.length > DESCRIZIONE_LIMIT
             ? c.descrizione_correttiva.substring(0, DESCRIZIONE_LIMIT - 3) + '...' 
             : c.descrizione_correttiva;
             
-        // Visualizza fino a 50 caratteri delle Note
+        // COLONNA NOTE
         const NOTE_LIMIT = 50;
-        const noteTroncate = (c.note || '').length > NOTE_LIMIT
-            ? c.note.substring(0, NOTE_LIMIT - 3) + '...'
-            : (c.note || 'N.D.'); // 'N.D.' se la nota è vuota
+        const noteContent = c.note; // Legge il contenuto raw dal JSON
+
+        let noteTroncate;
+        if (!noteContent) { // Cattura null, undefined o stringa vuota ('')
+            noteTroncate = 'N.D.'; 
+        } else if (noteContent.length > NOTE_LIMIT) {
+            noteTroncate = noteContent.substring(0, NOTE_LIMIT - 3) + '...'; 
+        } else {
+            noteTroncate = noteContent; 
+        }
         
         // Formatta la data (rimuove l'ora)
         const dataInserimentoBreve = c.data_inserimento ? c.data_inserimento.split(' ')[0] : 'N.D.';
@@ -720,8 +910,8 @@ function renderCorrettiveList(correttive) {
         html += `<td class="${statoClass} text-center">${c.stato}</td>`;
         // Colonna Costo
         html += `<td class="text-center ${costoClass}">${costoTesto}</td>`; 
-        // Colonna Note (NUOVA)
-        html += `<td title="${c.note || ''}">${noteTroncate}</td>`; 
+        // Colonna Note
+        html += `<td title="${c.note || ''}">${noteTroncate}</td>`;
         // Colonna Scadenza
         html += `<td>${c.data_scadenza || 'N.D.'}</td>`;
         // Colonna Responsabile
@@ -731,9 +921,12 @@ function renderCorrettiveList(correttive) {
         
         // Colonna Azioni (pulsante Modifica)
         html += `<td>
-                     <button class="btn btn-sm btn-info py-0 px-1" title="Modifica Correttiva ID ${c.id}" data-correttiva-id="${c.id}">
-                        <i class="bi bi-pencil-square"></i>
-                     </button>
+                    <button class="btn btn-warning btn-sm edit-correttiva-btn"
+                        data-id="${c.id}" 
+                        data-idpqd="${c.ID_PROGETTO_QUESTIONARIO_DOMANDA}"
+                        title="Modifica Azione Correttiva">
+                     <i class="fas fa-edit"></i>
+                    </button>                 
                  </td>`;
         html += `</tr>`;
     });
@@ -742,6 +935,15 @@ function renderCorrettiveList(correttive) {
     html += '</div>';
     
     container.innerHTML = html;
+
+    container.querySelectorAll('.edit-correttiva-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault(); 
+            const idCorrettiva = e.currentTarget.dataset.id;
+            handleEditCorrettiva(idCorrettiva);
+        });
+    });
+    
 }
 
 // ======================================================================
@@ -770,5 +972,178 @@ function fetchCorrettiveList(idPqd) {
             container.innerHTML = `<div class="alert alert-danger p-2">Impossibile caricare la lista correttive: ${error.message}</div>`;
         });
 }
+
+async function handleEditCorrettiva(idCorrettiva) {
+    console.log(`Caricamento dati per la correttiva ID: ${idCorrettiva}`);
+
+    // Passaggio 1: Fetch dei dati dal backend
+    try {
+        const response = await fetch(`/api/correttiva/dettaglio/${idCorrettiva}`);
+        if (!response.ok) throw new Error('Dati non trovati');
+        
+        const responseData = await response.json();
+        
+        // Estrai l'oggetto dettagli. Usa l'oggetto principale dato che non sembra annidato.
+        const dettaglioCorrettiva = responseData.dettaglio || responseData.data || responseData.correttiva || responseData; 
+        
+        console.log('Dati dettaglio estratti (oggetto finale):', dettaglioCorrettiva); 
+
+        // Passaggio 2: Popolamento della Modal e del Form
+        
+        // 2a. Imposta il titolo per l'Editing (questo già funzionava)
+        document.querySelector('#correttivaModal .modal-title').textContent = 'Modifica Azione Correttiva';
+        document.querySelector('#correttivaModal h4.fw-bold').innerHTML = '<i class="fas fa-edit me-2"></i> Modifica Correttiva';
+        document.getElementById('salvaCorrettivaBtn').innerHTML = '<i class="fas fa-save"></i> Salva Modifiche';
+        
+        // 2b. Campo Nascosto
+        document.getElementById('correttivaId').value = idCorrettiva; 
+        
+        // 2c. Popola i campi
+        // ⭐ CORREZIONE: Uso delle CHIAVI MAIUSCOLE (come da output console)
+        document.getElementById('descrizioneCorrettiva').value = dettaglioCorrettiva.DESCRIZIONE || '';
+        
+        // DATA: troncata a 10 caratteri ('YYYY-MM-DD') come richiesto dal campo input type="date"
+        document.getElementById('dataScadenza').value = dettaglioCorrettiva.DATA_SCADENZA ? dettaglioCorrettiva.DATA_SCADENZA.substring(0, 10) : '';
+        
+        document.getElementById('responsabile').value = dettaglioCorrettiva.RESPONSABILE_ID || '';
+        document.getElementById('noteCorrettiva').value = dettaglioCorrettiva.NOTE || '';
+        document.getElementById('statoCorrettiva').value = dettaglioCorrettiva.STATO || 'Aperta';
+        
+        // Gestione del Costo (RADIO BUTTONS)
+        const costo = String(dettaglioCorrettiva.COSTO).toLowerCase() === 'true'; 
+        if (costo) {
+            document.getElementById('costoSi').checked = true;
+        } else {
+            document.getElementById('costoNo').checked = true;
+        }
+
+        // Passaggio 3: Apri la modal
+        const modalElement = document.getElementById('correttivaModal');
+        const correttivaModalInstance = bootstrap.Modal.getOrCreateInstance(modalElement); 
+        correttivaModalInstance.show();
+
+    } catch (error) {
+        console.error('Errore nel caricamento dei dati per la modifica:', error);
+        alert('Errore nel caricamento dei dati per la modifica.');
+    }
+}
+
+// =====================================================================
+//Logica C vs. U (Create vs. Update)
+// =====================================================================
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('correttivaForm');
+    const saveButton = document.getElementById('salvaCorrettivaBtn');
+    const modalElement = document.getElementById('correttivaModal');
+    
+    // ... (Logica di Reset Modal) ...
+
+    modalElement.addEventListener('hidden.bs.modal', function () {
+        // Pulisce il campo ID per riportare la modal in modalità 'Crea'
+        document.getElementById('correttivaId').value = ''; 
+        
+        // Resetta l'interfaccia a 'Salva Nuova Correttiva'
+        document.querySelector('#correttivaModal .modal-title').textContent = 'Gestione Azioni Correttive';
+        document.querySelector('#correttivaModal h4.fw-bold').innerHTML = '<i class="bi bi-plus-circle-fill me-2"></i> Inserisci Nuova Correttiva';
+        saveButton.innerHTML = '<i class="bi bi-gear"></i> Salva Nuova Correttiva';
+        
+        // Pulisci il form per evitare che i vecchi dati persistano
+        form.reset(); 
+        // Pulisce anche l'eventuale messaggio di errore/successo
+        document.getElementById('modalMessageContainer').innerHTML = '';
+    });
+
+ // LOGICA DI SOTTOMISSIONE UNIFICATA (QUI INIZIA IL NUOVO CODICE CHIAVE)
+form.addEventListener('submit', async function(e) {
+    e.preventDefault(); 
+    
+    // ⭐ BLOCCO DI DEBUG: Verifica ID e URL prima della chiamata
+    const idToModify = document.getElementById('correttivaId').value;
+    // Condizione robusta per la modifica: deve esserci un valore non nullo/vuoto
+    const isUpdate = idToModify && idToModify !== '0' && idToModify !== ''; 
+    
+    console.log(`ID Correttiva nel form (correttivaId): "${idToModify}"`);
+    console.log(`Modalità Update attiva (isUpdate): ${isUpdate}`);
+    
+    // 1. Determina URL
+    let url;
+    if (isUpdate) {
+        url = `/api/correttiva/modifica/${idToModify}`; // Rotta di UPDATE
+    } else {
+        url = '/api/correttiva/salva_nuova'; // Rotta di CREATE
+    }
+    console.log(`URL di destinazione: ${url}`);
+    
+    // 2. Raccogli i dati del form (Metodo più pulito)
+    const formData = new FormData(form);
+    
+    // Usa Object.fromEntries per raccogliere tutti i campi (sfrutta l'attributo 'name')
+    const data = Object.fromEntries(formData.entries());
+    
+    // 2.1 Correzione Mappaggio Chiavi (solo dove il name HTML differisce dal key JSON)
+    // Il tuo form usa name="note" ma il Service si aspetta 'noteCorrettiva'
+    if (data.note) {
+        data.noteCorrettiva = data.note;
+        delete data.note; // Rimuove la chiave non necessaria
+    }
+    
+    // 2.2 Inclusione Esplicita dell'ID nel JSON Body
+    // Se è un Update, il backend potrebbe aver bisogno dell'ID nel corpo JSON oltre che nell'URL
+    if (isUpdate) {
+        // Il campo hidden ha name="id_correttiva_modifica" ma lo inviamo come id_correttiva
+        data.id_correttiva = idToModify; 
+        console.log('Dati JSON inviati (Update):', data);
+    } else {
+        console.log('Dati JSON inviati (Create):', data);
+    }
+
+    // 3. Invia la richiesta
+    try {
+        const messageContainer = document.getElementById('modalMessageContainer');
+        messageContainer.innerHTML = ''; 
+        
+        const saveButton = document.getElementById('salvaCorrettivaBtn');
+        const modalElement = document.getElementById('correttivaModal');
+        
+        saveButton.disabled = true;
+        saveButton.innerHTML = isUpdate ? '<i class="fas fa-spinner fa-spin me-2"></i> Salvataggio modifiche...' : '<i class="fas fa-spinner fa-spin me-2"></i> Salvataggio...';
+
+        const fetchResponse = await fetch(url, {
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data) // Invio dei dati come JSON
+        });
+        
+        // ⭐ DEBUG: Controlla lo status HTTP della risposta. Se 404, il backend è il problema.
+        console.log('Stato HTTP di risposta:', fetchResponse.status); 
+
+        const result = await fetchResponse.json();
+
+        if (result.success) {
+            messageContainer.innerHTML = `<div class="alert alert-success mt-3">${isUpdate ? 'Modifica salvata con successo!' : 'Nuova correttiva salvata con successo!'}</div>`;
+            
+            fetchCorrettiveList(document.getElementById('modalIdPqd').value); 
+            
+            setTimeout(() => {
+                const modalInstance = bootstrap.Modal.getInstance(modalElement);
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
+            }, 1000); 
+
+        } else {
+            messageContainer.innerHTML = `<div class="alert alert-danger mt-3">Errore: ${result.error || 'Errore sconosciuto nel salvataggio.'}</div>`;
+        }
+
+    } catch (error) {
+        // ... (Gestione errori) ...
+    } finally {
+        saveButton.disabled = false;
+        saveButton.innerHTML = isUpdate ? '<i class="fas fa-save"></i> Salva Modifiche' : '<i class="bi bi-gear"></i> Salva Nuova Correttiva';
+    }
+});
+    
+});
+
 </script>
 {% endblock %}

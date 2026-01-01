@@ -5,12 +5,8 @@
 {% block head_extra %}
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <style>
-        /* Nasconde la colonna ID */
-        #risposteTable th:first-child,
-        #risposteTable td:first-child {
-            display: none;
-        }
-
+        /* CSS: Pulizia e stilizzazione */
+        
         /* Regola per la tabella: evita che il testo vada a capo e tronca con l'ellissi */
         #risposteTable th,
         #risposteTable td {
@@ -59,42 +55,48 @@
                         
                         <div class="mb-3">
                             <label for="descrRisposta" class="form-label">Descrizione Risposta</label>
-                            <input type="text" class="form-control" id="descrRisposta" name="descrRisposta" required>
+                            <textarea class="form-control" id="descrRisposta" rows="3" required></textarea>
                         </div>
-
                         <div class="mb-3">
-                            <label for="idGruppoRisposta" class="form-label">Gruppo Risposta</label>
-                            <select class="form-control" id="idGruppoRisposta" name="idGruppoRisposta" multiple="multiple" required></select>
+                            <label for="idGruppoRisposta" class="form-label">Gruppo/i Risposta</label>
+                            <select class="form-control" id="idGruppoRisposta" multiple="multiple" style="width: 100%;" required>
+                                </select>
                         </div>
-                        
                         <div class="mb-3">
                             <label for="pesoRisposta" class="form-label">Peso</label>
-                            <input type="number" class="form-control" id="pesoRisposta" name="pesoRisposta" step="0.01" value="0.00">
+                            <input type="number" step="0.01" class="form-control" id="pesoRisposta" required>
                         </div>
-
-                        <button type="submit" class="btn btn-primary" id="salvaBtn">
-                            <i class="fas fa-save me-2"></i> Salva
-                        </button>
-                        <button type="button" class="btn btn-secondary" id="resetFormBtn">
-                            <i class="fas fa-undo me-2"></i> Resetta
-                        </button>
+                        <div class="d-flex justify-content-between">
+                            <button type="submit" class="btn btn-success btn-sm me-2"><i class="fas fa-save me-1"></i> Salva</button>
+                            <button type="button" class="btn btn-secondary btn-sm" id="resetFormBtn"><i class="fas fa-redo me-1"></i> Reset</button>
+                        </div>
                     </form>
                 </div>
             </div>
         </div>
-        
-        <div class="col-lg-8 col-md-6">
+
+        <div class="col-lg-8 col-md-6 mb-4">
             <div class="card">
                 <div class="card-header bg-secondary text-white">
                     <h5 class="mb-0">Elenco Risposte</h5>
                 </div>
                 <div class="card-body">
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="gruppoFilter" class="form-label">Filtra per Gruppo Risposta:</label>
+                            <select id="gruppoFilter" class="form-control" style="width: 100%;">
+                                <option value="">Tutti i Gruppi</option>
+                                </select>
+                        </div>
+                    </div>
+
                     <div class="table-responsive">
-                        <table class="table table-sm table-hover" id="risposteTable">
+                        <table id="risposteTable" class="table table-striped table-hover">
                             <thead>
                                 <tr>
                                     <th>ID</th>
-                                    <th>Descrizione</th>
+                                    <th>Descrizione Risposta</th>
                                     <th>Gruppo(i)</th>
                                     <th>Peso</th>
                                     <th>Modificato da</th>
@@ -102,8 +104,8 @@
                                     <th>Azioni</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                            </tbody>
+                            <tbody id="risposteTableBody">
+                                </tbody>
                         </table>
                     </div>
                 </div>
@@ -114,190 +116,322 @@
 {% endblock content %}
 
 {% block scripts %}
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script> 
+    
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    
+    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script> 
+
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        // Forza lo stile del gradiente sullo sfondo all'avvio della pagina
-        document.body.style.backgroundImage = 'linear-gradient(to bottom, #f8f9fa, #e9ecef)';
-        document.body.style.backgroundAttachment = 'fixed';
-        
-        const RISPOSTA_API_URL = '/api/risposta/';
-        const GRUPPO_API_URL = '/api/risposta/gruppi';
-        const csrfToken = document.getElementById('csrf_token').value;
-        
-        const rispostaForm = document.getElementById('rispostaForm');
-        const risposteTableBody = document.querySelector('#risposteTable tbody');
-        const rispostaIdInput = document.getElementById('rispostaId');
-        const descrRispostaInput = document.getElementById('descrRisposta');
-        const pesoRispostaInput = document.getElementById('pesoRisposta');
-        const resetFormBtn = document.getElementById('resetFormBtn');
-        const idGruppoRispostaSelect = $('#idGruppoRisposta');
+    const RISPOSTA_API_URL = '/api/risposta/'; 
+    const GRUPPO_API_URL = '/api/gruppo_risposta/';
+    const rispostaForm = document.getElementById('rispostaForm');
+    const rispostaIdInput = document.getElementById('rispostaId');
+    const descrRispostaInput = document.getElementById('descrRisposta');
+    const idGruppoRispostaSelect = document.getElementById('idGruppoRisposta');
+    const pesoRispostaInput = document.getElementById('pesoRisposta');
+    const resetFormBtn = document.getElementById('resetFormBtn');
+    const csrfToken = document.getElementById('csrf_token').value;
+    const risposteTableBody = document.getElementById('risposteTableBody');
+    
+    // Variabili per il filtro e l'istanza DataTables
+    const gruppoFilterSelect = document.getElementById('gruppoFilter'); 
+    let dataTableInstance = null; 
 
-        function showFlashMessage(message, category) {
-            const messagesDiv = document.querySelector('.messages');
-            const alertDiv = document.createElement('div');
-            alertDiv.className = `alert alert-${category} alert-dismissible fade show`;
-            alertDiv.setAttribute('role', 'alert');
-            alertDiv.textContent = message;
-            alertDiv.innerHTML += '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
-            messagesDiv.appendChild(alertDiv);
-        }
+    // Funzione helper per mostrare messaggi
+    function showFlashMessage(message, category) {
+        const messagesDiv = document.querySelector('.messages');
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${category} alert-dismissible fade show`;
+        alertDiv.setAttribute('role', 'alert');
+        alertDiv.textContent = message;
+        alertDiv.innerHTML += '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+        messagesDiv.appendChild(alertDiv);
+    }
 
-        async function loadGruppiForSelect() {
-            try {
-                const response = await fetch(GRUPPO_API_URL);
-                if (!response.ok) {
-                    throw new Error('Errore nel caricamento dei gruppi di risposta');
-                }
-                const gruppi = await response.json();
-                idGruppoRispostaSelect.select2({
-                    data: gruppi.map(g => ({ id: g.id, text: g.descr })),
-                    placeholder: "Seleziona uno o più gruppi",
-                    allowClear: true
-                });
-            } catch (error) {
-                console.error("Errore nel caricamento dei gruppi per la select:", error);
-                showFlashMessage(`Errore nel caricamento dei gruppi: ${error.message}`, 'danger');
+    // Carica i gruppi per entrambe le select
+    async function loadGruppiForSelect() {
+        try {
+            const response = await fetch(`${RISPOSTA_API_URL}gruppi`); 
+            if (!response.ok) {
+                throw new Error('Errore nel caricamento dei gruppi di risposta');
             }
-        }
+            const gruppi = await response.json();
+            
+            // Pulisce e popola le select
+            idGruppoRispostaSelect.innerHTML = '';
+            gruppoFilterSelect.innerHTML = '<option value="">Tutti i Gruppi</option>'; 
+            
+            gruppi.forEach(gruppo => {
+                // Per il form (select multipla Select2)
+                const optionForm = document.createElement('option');
+                optionForm.value = gruppo.id;
+                optionForm.textContent = gruppo.descr;
+                idGruppoRispostaSelect.appendChild(optionForm);
 
-        async function loadRisposte() {
-            try {
-                const response = await fetch(RISPOSTA_API_URL);
-                if (!response.ok) {
-                    throw new Error('Errore nel recupero delle risposte');
-                }
-                const risposte = await response.json();
-                risposteTableBody.innerHTML = '';
-                if (risposte.length > 0) {
-                    risposte.forEach(r => {
-                        const row = risposteTableBody.insertRow();
+                // Per il filtro (select singola DataTables)
+                const optionFilter = document.createElement('option');
+                optionFilter.value = gruppo.id;
+                optionFilter.textContent = gruppo.descr;
+                gruppoFilterSelect.appendChild(optionFilter);
+            });
+
+            // Inizializza Select2
+            $(idGruppoRispostaSelect).select2({ 
+                placeholder: "Seleziona uno o più gruppi", 
+                allowClear: true 
+            });
+            $(gruppoFilterSelect).select2({ 
+                placeholder: "Tutti i Gruppi",
+                allowClear: true
+            });
+
+        } catch (error) {
+            console.error("Errore nel caricamento dei gruppi:", error);
+            showFlashMessage(`Errore nel caricamento dei gruppi: ${error.message}`, 'danger');
+        }
+    }
+
+    // Aggiunge l'attributo data-gruppo-ids e inizializza DataTables
+    async function loadRisposte() {
+        if (dataTableInstance) {
+            dataTableInstance.destroy();
+            risposteTableBody.innerHTML = '';
+        }
+        
+        try {
+            const response = await fetch(RISPOSTA_API_URL);
+            const risposte = await response.json();
+
+            if (risposte.length > 0) {
+                risposte.forEach(r => {
+                    const row = risposteTableBody.insertRow();
+                    
+                    // FONDAMENTALE: Attributo dati per il filtro personalizzato
+                    row.setAttribute('data-gruppo-ids', r.gruppi_risposta_ids.join(',')); 
+
+                    const dataOriginale = new Date(r.data_ultima_modifica);
+                    const dataFormattata = dataOriginale.toLocaleDateString('it-IT') + ' ' + dataOriginale.toLocaleTimeString('it-IT');
+                    const gruppiText = r.gruppi_risposta_descr.join(', ');
+
+                    // 0. ID (Indice 0)
+                    row.insertCell().textContent = r.id; 
+
+                    // 1. Descrizione Risposta (Indice 1)
+                    row.insertCell().textContent = r.descr;
+
+                    // 2. Gruppo(i) (Indice 2)
+                    row.insertCell().textContent = gruppiText;
+                    
+                    // 3. Peso (Indice 3)
+                    row.insertCell().textContent = r.peso;
+
+                    // 4. Modificato da (Indice 4)
+                    row.insertCell().textContent = r.modificato_da;
+
+                    // 5. Data Ultima Modifica (Indice 5)
+                    row.insertCell().textContent = dataFormattata;
+
+                    // 6. Azioni (Indice 6)
+                    const azioniCell = row.insertCell();
+                    azioniCell.innerHTML = `
+                        <button class="btn btn-warning btn-sm edit-btn me-2" data-id="${r.id}" title="Modifica">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-danger btn-sm delete-btn" data-id="${r.id}" title="Elimina">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    `;
+                });
+                
+                // 2. Inizializza DataTables
+                if (typeof $.fn.DataTable !== 'undefined') {
+                    dataTableInstance = $('#risposteTable').DataTable({
+                        stateSave: false, 
+                        order: [[2, 'asc']], 
                         
-                        // Formatta la data nel formato dd/mm/yyyy
-                        const dataModifica = new Date(r.data_ultima_modifica);
-                        const dataFormattata = dataModifica.toLocaleDateString('it-IT');
-                        
-                        row.innerHTML = `
-                            <td>${r.id}</td>
-                            <td>${r.descr}</td>
-                            <td>${r.gruppi_risposta_descr.join(', ')}</td>
-                            <td>${r.peso}</td>
-                            <td>${r.modificato_da}</td>
-                            <td>${dataFormattata}</td>
-                            <td>
-                                <button class="btn btn-sm btn-warning edit-btn" data-id="${r.id}"><i class="fas fa-edit"></i></button>
-                                <button class="btn btn-sm btn-danger delete-btn" data-id="${r.id}"><i class="fas fa-trash"></i></button>
-                            </td>
-                        `;
+                        // Nasconde la barra di ricerca ma mantiene il motore di filtro attivo
+                        // dom: 'rtip', 
+                        dom: 'rt',
+                        lengthChange: false,
+                        paging: false,
+                        info: false,
+                        pageLength: 10,
+                        columnDefs: [
+                            { 
+                                targets: 0, // ID
+                                visible: false, // Nasconde l'ID correttamente
+                                orderable: false 
+                            },
+                            { 
+                                targets: 2, // Gruppo(i)
+                                type: 'string' 
+                            },
+                            { 
+                                targets: 6, // Colonna Azioni
+                                orderable: false 
+                            }
+                        ]
                     });
-                } else {
-                    risposteTableBody.innerHTML = '<tr><td colspan="7" class="text-center">Nessuna risposta trovata.</td></tr>';
+                    
+                    // Applica la logica di filtro DataTables custom
+                    applyGruppoFilter(dataTableInstance);
                 }
-            } catch (error) {
-                console.error("Errore nel recupero delle risposte:", error);
-                showFlashMessage(`Errore nel recupero dei dati: ${error.message}`, 'danger');
+            } else {
+                showFlashMessage('Nessuna risposta trovata.', 'info');
             }
+        } catch (error) {
+            console.error("Errore nel caricamento delle risposte:", error);
+            showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
         }
+    }
+    
+    // Implementa la logica di filtro personalizzata di DataTables
+    function applyGruppoFilter(table) {
+        // Rimuove eventuali filtri precedenti su questa tabella
+        $.fn.dataTable.ext.search.pop(); 
 
-        async function saveData(data, method, url) {
+        // Aggiunge la funzione di filtro personalizzata
+        $.fn.dataTable.ext.search.push(
+            function(settings, data, dataIndex) {
+                // Controlla che il filtro si applichi alla tabella giusta
+                if (settings.nTable.id !== 'risposteTable') {
+                    return true;
+                }
+
+                const selectedGruppoId = gruppoFilterSelect.value;
+                
+                // Se non è selezionato nessun gruppo, mostra tutte le righe
+                if (selectedGruppoId === "" || selectedGruppoId === null) {
+                    return true;
+                }
+
+                // Recupera l'elemento riga DOM tramite l'indice DataTables
+                const rowNode = table.row(dataIndex).node();
+                // Legge l'attributo data-gruppo-ids che contiene una stringa di ID separati da virgola
+                const rowGruppoIdsString = rowNode.getAttribute('data-gruppo-ids');
+                
+                // Se la risposta non ha gruppi, la nasconde se è attivo un filtro
+                if (!rowGruppoIdsString) {
+                    return false; 
+                }
+
+                const rowGruppoIds = rowGruppoIdsString.split(',').map(id => id.trim());
+                
+                // Restituisce true se l'ID del gruppo selezionato è presente negli ID della riga
+                return rowGruppoIds.includes(selectedGruppoId);
+            }
+        );
+    }
+    
+    // Event Listener: Ridisegna la tabella DataTables quando il filtro cambia
+    $(document).on('change', '#gruppoFilter', function() {
+        if (dataTableInstance) {
+            // Ridisegna la tabella per applicare la funzione di filtro personalizzata
+            dataTableInstance.draw();
+        }
+    });
+
+    // Event Listener per la sottomissione del form
+    rispostaForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        
+        const id = rispostaIdInput.value;
+        const descr = descrRispostaInput.value.trim();
+        const gruppi_risposta_ids = $(idGruppoRispostaSelect).val().map(id => parseInt(id));
+        const peso = parseFloat(pesoRispostaInput.value);
+        
+        const method = id ? 'PUT' : 'POST';
+        const url = id ? `${RISPOSTA_API_URL}${id}` : RISPOSTA_API_URL;
+
+        const data = {
+            descr: descr,
+            gruppi_risposta_ids: gruppi_risposta_ids,
+            peso: peso //,
+            // modificato_da: "UserWeb" 
+        };
+        
+        try {
+            const response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                showFlashMessage(`Risposta ${id ? 'aggiornata' : 'creata'} correttamente.`, 'success');
+                rispostaForm.reset();
+                rispostaIdInput.value = '';
+                $(idGruppoRispostaSelect).val(null).trigger('change');
+                loadRisposte();
+            } else {
+                showFlashMessage(`Errore: ${result.error || 'Operazione fallita.'}`, 'danger');
+            }
+        } catch (error) {
+            console.error("Errore nella richiesta API:", error);
+            showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
+        }
+    });
+    
+    // Event Listener per il pulsante Modifica e Elimina
+    risposteTableBody.addEventListener('click', async (event) => {
+        if (event.target.closest('.edit-btn')) {
+            const id = event.target.closest('.edit-btn').getAttribute('data-id');
             try {
-                const response = await fetch(url, {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken
-                    },
-                    body: JSON.stringify(data)
-                });
-                const result = await response.json();
+                const response = await fetch(`${RISPOSTA_API_URL}${id}`);
+                const risposta = await response.json();
+                
                 if (response.ok) {
-                    showFlashMessage(`Risposta salvata correttamente.`, 'success');
-                    rispostaForm.reset();
-                    rispostaIdInput.value = '';
-                    $(idGruppoRispostaSelect).val(null).trigger('change');
-                    loadRisposte();
+                    rispostaIdInput.value = risposta.id;
+                    descrRispostaInput.value = risposta.descr;
+                    pesoRispostaInput.value = risposta.peso;
+                    // Seleziona i gruppi in Select2
+                    $(idGruppoRispostaSelect).val(risposta.gruppi_risposta_ids).trigger('change'); 
+                    showFlashMessage('Dati caricati nel modulo per la modifica.', 'info');
                 } else {
-                    showFlashMessage(`Errore: ${result.error || response.statusText}`, 'danger');
+                    showFlashMessage(`Errore nel caricamento dei dati: ${risposta.error || ''}`, 'danger');
                 }
             } catch (error) {
-                console.error("Errore nella richiesta API:", error);
+                console.error("Errore nella richiesta API get by ID:", error);
                 showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
             }
         }
-
-        rispostaForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const id = rispostaIdInput.value;
-            const descr = descrRispostaInput.value;
-            const peso = parseFloat(pesoRispostaInput.value);
-            const gruppi_risposta_ids = idGruppoRispostaSelect.val().map(Number);
-            
-            if (gruppi_risposta_ids.length === 0) {
-                showFlashMessage('Seleziona almeno un gruppo di risposta.', 'warning');
-                return;
-            }
-
-            const data = {
-                descr: descr,
-                gruppi_risposta_ids: gruppi_risposta_ids,
-                peso: peso
-            };
-
-            if (id) {
-                await saveData(data, 'PUT', `${RISPOSTA_API_URL}${id}`);
-            } else {
-                await saveData(data, 'POST', RISPOSTA_API_URL);
-            }
-        });
-
-        risposteTableBody.addEventListener('click', async (event) => {
-            if (event.target.closest('.edit-btn')) {
-                const id = event.target.closest('.edit-btn').getAttribute('data-id');
+        
+        if (event.target.closest('.delete-btn')) {
+            const id = event.target.closest('.delete-btn').getAttribute('data-id');
+            if (confirm(`Sei sicuro di voler eliminare la risposta con ID ${id}?`)) {
                 try {
-                    const response = await fetch(`${RISPOSTA_API_URL}${id}`);
-                    const risposta = await response.json();
+                    const response = await fetch(`${RISPOSTA_API_URL}${id}`, {
+                        method: 'DELETE',
+                        headers: { 'X-CSRFToken': csrfToken }
+                    });
+                    const result = await response.json();
                     if (response.ok) {
-                        rispostaIdInput.value = risposta.id;
-                        descrRispostaInput.value = risposta.descr;
-                        pesoRispostaInput.value = risposta.peso;
-                        $(idGruppoRispostaSelect).val(risposta.gruppi_risposta_ids).trigger('change');
+                        showFlashMessage('Risposta eliminata correttamente.', 'success');
+                        loadRisposte();
                     } else {
-                        showFlashMessage(`Errore nel recupero dei dati per la modifica: ${risposta.error || ''}`, 'danger');
+                        showFlashMessage(`Errore nell'eliminazione della risposta: ${result.error || ''}`, 'danger');
                     }
                 } catch (error) {
-                    console.error("Errore nella richiesta API get by ID:", error);
+                    console.error("Errore nella richiesta API delete risposta:", error);
                     showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
                 }
-            } else if (event.target.closest('.delete-btn')) {
-                const id = event.target.closest('.delete-btn').getAttribute('data-id');
-                if (confirm(`Sei sicuro di voler eliminare la risposta con ID ${id}?`)) {
-                    try {
-                        const response = await fetch(`${RISPOSTA_API_URL}${id}`, {
-                            method: 'DELETE',
-                            headers: { 'X-CSRFToken': csrfToken }
-                        });
-                        const result = await response.json();
-                        if (response.ok) {
-                            showFlashMessage('Risposta eliminata correttamente.', 'success');
-                            loadRisposte();
-                        } else {
-                            showFlashMessage(`Errore nell'eliminazione della risposta: ${result.error || ''}`, 'danger');
-                        }
-                    } catch (error) {
-                        console.error("Errore nella richiesta API delete risposta:", error);
-                        showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
-                    }
-                }
             }
-        });
+        }
+    });
 
-        resetFormBtn.addEventListener('click', () => {
-            rispostaForm.reset();
-            rispostaIdInput.value = '';
-            $(idGruppoRispostaSelect).val(null).trigger('change');
-        });
+    resetFormBtn.addEventListener('click', () => {
+        rispostaForm.reset();
+        rispostaIdInput.value = '';
+        $(idGruppoRispostaSelect).val(null).trigger('change');
+    });
 
+    $(document).ready(function() {
         loadGruppiForSelect().then(() => loadRisposte());
     });
 </script>

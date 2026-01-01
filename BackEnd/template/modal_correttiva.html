@@ -19,6 +19,8 @@
                 
                 <form id="correttivaForm">
                     <input type="hidden" id="modalIdPqd" name="id_progetto_questionario_domanda">
+                    <input type="hidden" id="correttivaId" name="id_correttiva_modifica">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="mb-3">
                         <label for="descrizioneCorrettiva" class="form-label fw-bold">Descrizione Azione Correttiva *</label>
                         <textarea class="form-control" id="descrizioneCorrettiva" name="descrizione_correttiva" rows="3" required></textarea>
@@ -61,7 +63,7 @@
 
                     <div class="mb-3">
                         <label for="noteCorrettiva" class="form-label">Note</label>
-                        <textarea class="form-control" id="noteCorrettiva" name="note" rows="2"></textarea>
+                        <textarea class="form-control" id="noteCorrettiva" name="noteCorrettiva" rows="2"></textarea>
                     </div>
 
                     <div id="modalMessageContainer"></div>

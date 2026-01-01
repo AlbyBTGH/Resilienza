@@ -38,12 +38,14 @@ def create_risposta():
     descr = data.get('descr')
     gruppi_risposta_ids = data.get('gruppi_risposta_ids', [])
     peso = data.get('peso')
+    # modificato_da = data.get('modificato_da')
+    modificato_da = session.get('username', 'Sistema')
 
     if not descr:
         return jsonify({"error": "Descrizione è obbligatoria."}), 400
 
     try:
-        new_risposta_dict, status_code = service_t_risposta.create_risposta(descr, gruppi_risposta_ids, peso)
+        new_risposta_dict, status_code = service_t_risposta.create_risposta(descr, gruppi_risposta_ids, peso, modificato_da)
         return jsonify(new_risposta_dict), status_code
     except Exception as e:
         logging.error(f"Errore nel controller durante la creazione della risposta: {str(e)}")

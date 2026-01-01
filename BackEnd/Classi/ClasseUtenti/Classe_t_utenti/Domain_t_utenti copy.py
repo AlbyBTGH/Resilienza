@@ -5,7 +5,6 @@ from sqlalchemy.orm import relationship
 from Classi.ClasseDB.db_connection import Base
 from Classi.ClasseUtenti.Classe_t_ruolo.Domain_t_ruolo import TRuolo
 from sqlalchemy.sql import func
-from Classi.ClasseProgettoAnalista.Domain_progetto_analisti import TProgettoAnalisti
 
 class TUtenti(Base):
     __tablename__ = 't_utenti'
@@ -26,29 +25,6 @@ class TUtenti(Base):
 
     # Relationship with TRuolo
     ruolo_rel = relationship('TRuolo', back_populates="utenti_rel")
-
-    # ====================================================================
-    # ⭐ NUOVE RELAZIONI PER I PROGETTI (ANALISTA)
-    # ====================================================================
-    
-    # 1. Relazione 1-a-Molti con l'Oggetto di Associazione (Per CRUD/Scrittura)
-    # Un TUtenti ha molte TProgettoAnalisti. 
-    # back_populates punta all'attributo 'analista_ref' definito in TProgettoAnalisti.
-    progetti_associazioni = relationship(
-        "TProgettoAnalisti", 
-        back_populates="analista_ref", 
-        cascade="all, delete-orphan" # Se l'Utente viene eliminato, elimina le associazioni
-    ) 
-
-    # 2. Relazione Molti-a-Molti Diretta (Solo Lettura)
-    # Scorciatoia per accedere direttamente agli oggetti TProgetto (Progetti).
-    progetti = relationship(
-        "TProgetto", 
-        secondary="PROGETTO_ANALISTI", 
-        primaryjoin="TUtenti.id == TProgettoAnalisti.ID_UTENTE",
-        secondaryjoin="TProgettoAnalisti.ID_PROGETTO == TProgetto.id",
-        viewonly=True 
-    )
 
     def __repr__(self):
         return f"<TUtenti(id={self.id}, username='{self.username}', fkIdRuolo={self.fkIdRuolo})>"

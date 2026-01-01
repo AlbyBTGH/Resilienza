@@ -35,61 +35,35 @@ class RepositoryProgettoQuestionarioPunteggio:
                 
                 # 2. Query di Calcolo (SELECT) per recuperare i dati (Assunta invariata)
                 calcolo_query = f"""
-                SELECT
-                    p.ID AS id_progetto,
-                    pq.ID_QUESTIONARIO AS id_questionario,
-                    p.ID_CLIENTE AS id_cliente,
-                    pq.ID AS id_progetto_questionario,
-                    cat.ID AS id_categoria,
-                    
-                    -- NUOVA LOGICA: (Punteggio Ottenuto / Punteggio Max) * 100 
-                    ROUND(
-                        (
-                            (SUM(COALESCE(r_scelta.PESO, 0)) * 100.0) / 
-                            SUM(r_max_peso.MAX_PESO_GRUPPO) 
-                        ), 
-                    2) AS peso_totale 
-                    
-                FROM
-                    progetto_questionario pq
-                
-                -- JOIN CRITICA 1: Collega Questionario (pq) a Domanda (d) tramite la tabella di mapping (pqd)
-                JOIN progetto_questionario_domanda pqd_filter 
-                    ON pqd_filter.ID_PROGETTO_QUESTIONARIO = pq.ID
-                    
-                -- JOIN per collegare le domande alle categorie
-                JOIN domande d ON d.ID = pqd_filter.ID_DOMANDA
-                JOIN driver dr ON d.ID_DRIVER = dr.ID
-                JOIN categoria cat ON dr.ID_CATEGORIA = cat.ID
-                JOIN progetto p ON pq.ID_PROGETTO = p.ID
-
-                -- LEFT JOIN per recuperare la RISPOSTA SCELTA dall'utente (per il Numeratore)
-                LEFT JOIN progetto_questionario_domanda pqd_scelta ON 
-                    pqd_scelta.ID_PROGETTO_QUESTIONARIO = pq.ID AND pqd_scelta.ID_DOMANDA = d.ID
-                LEFT JOIN risposta_cliente rc ON rc.ID_PROGETTO_QUESTIONARIO_DOMANDA = pqd_scelta.ID
-                LEFT JOIN risposta r_scelta ON r_scelta.ID_RISPOSTA = rc.ID_RISPOSTA
-                
-                -- NUOVA LOGICA: LEFT JOIN per trovare il MAX_PESO del Gruppo Risposta corretto
-                LEFT JOIN (
-                    SELECT 
-                        grr.ID_GRUPPO_RISPOSTA, 
-                        MAX(r.PESO) AS MAX_PESO_GRUPPO
-                    FROM gruppo_risposta_risposta grr
-                    JOIN risposta r 
-                        ON r.ID_RISPOSTA = grr.ID_RISPOSTA
-                    GROUP BY grr.ID_GRUPPO_RISPOSTA
-                ) AS r_max_peso 
-                -- Colleghiamo il MAX_PESO calcolato al Gruppo Risposta definito nella tabella di mapping PQD!
-                ON r_max_peso.ID_GRUPPO_RISPOSTA = pqd_filter.ID_GRUPPO_RISPOSTA
-                
-                WHERE
-                    pq.ID = :id_pq
-                GROUP BY
-                    p.ID, pq.ID_QUESTIONARIO, p.ID_CLIENTE, pq.ID, cat.ID
-                
-                -- Filtro essenziale: esclude le categorie se il punteggio massimo è zero 
-                HAVING 
-                    SUM(r_max_peso.MAX_PESO_GRUPPO) > 0
+                    SELECT
+                        p.ID AS id_progetto,
+                        pq.ID_QUESTIONARIO AS id_questionario,
+                        p.ID_CLIENTE AS id_cliente,
+                        pq.ID AS id_progetto_questionario,
+                        cat.ID AS id_categoria,
+                        SUM(r.PESO) AS peso_totale
+                    FROM
+                        risposta_cliente rc
+                    JOIN
+                        progetto_questionario_domanda pqd ON rc.ID_PROGETTO_QUESTIONARIO_DOMANDA = pqd.ID
+                    JOIN
+                        progetto_questionario pq ON pqd.ID_PROGETTO_QUESTIONARIO = pq.ID
+                    JOIN
+                        progetto p ON pq.ID_PROGETTO = p.ID
+                    JOIN
+                        cliente c ON p.ID_CLIENTE = c.ID
+                    JOIN
+                        risposta r ON rc.ID_RISPOSTA = r.ID_RISPOSTA
+                    JOIN
+                        domande d ON pqd.ID_DOMANDA = d.ID
+                    JOIN
+                        driver dr ON d.ID_DRIVER = dr.ID
+                    JOIN
+                        categoria cat ON dr.ID_CATEGORIA = cat.ID
+                    WHERE
+                        pq.ID = :id_pq
+                    GROUP BY
+                        p.ID, pq.ID_QUESTIONARIO, p.ID_CLIENTE, pq.ID, cat.ID
                 """
                 
                 # 3. Logica di inserimento (INSERT INTO... SELECT)

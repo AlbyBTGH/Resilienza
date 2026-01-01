@@ -8,6 +8,7 @@ from Classi.ClasseAnagrafica.ClasseAmbito.Domain_t_ambito import TAmbito
 from Classi.ClasseAnagrafica.ClasseStatoProgetto.Domain_t_stato_progetto import TStatoProgetto
 from Classi.ClasseAnagrafica.ClasseCliente.Domain_t_cliente import TCliente
 from Classi.ClasseProgettoQuestionario.Domain_progetto_questionario import ProgettoQuestionario
+from Classi.ClasseProgettoAnalista.Domain_progetto_analisti import TProgettoAnalisti
 
 class TProgetto(Base):
     __tablename__ = 'progetto'
@@ -33,6 +34,25 @@ class TProgetto(Base):
         "ProgettoQuestionario",
         back_populates="progetto",
         cascade="all, delete-orphan"
+    )
+
+    # 1. Relazione 1-a-Molti con l'Oggetto di Associazione (CRUD/Scrittura)
+    # TProgetto ha molte TProgettoAnalisti.
+    # 'progetto_ref' è il nome del back_populates in TProgettoAnalisti.
+    analisti_associazioni = relationship(
+        "TProgettoAnalisti", 
+        back_populates="progetto_ref", 
+        cascade="all, delete-orphan" # Se il Progetto viene eliminato, elimina le associazioni
+    ) 
+                                        
+    # 2. Relazione Molti-a-Molti (SOLO Lettura)
+    # Permette di accedere direttamente alla lista di oggetti TUtenti (Analisti)
+    analisti = relationship(
+        "TUtenti", 
+        secondary="PROGETTO_ANALISTI", # Nome della tabella SQL
+        primaryjoin="TProgetto.id == TProgettoAnalisti.ID_PROGETTO",
+        secondaryjoin="TProgettoAnalisti.ID_UTENTE == TUtenti.id",
+        viewonly=True # Importante: non usare questa per modificare l'associazione
     )
 
     # 🧩 Property per accedere ai questionari direttamente

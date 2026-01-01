@@ -1,7 +1,6 @@
 # Classi/ClasseUtenti/Classe_t_utenti/Service_t_utenti.py (Assumendo questo percorso)
 from Classi.ClasseUtenti.Classe_t_utenti.Repository_t_utenti import Repository_t_utenti
 from werkzeug.security import check_password_hash
-import logging
 
 class Service_t_utenti:
     def __init__(self):
@@ -29,25 +28,4 @@ class Service_t_utenti:
     def change_password(self, public_id, old_password, new_password):
         return self.repository.change_password(public_id, old_password, new_password)
 
-    # ===============================
-    # Ottieni tutti gli utenti con ruolo Analista
-    # ===============================
-    def get_all_analisti(self):
-        try:
-            # Chiama il Repository con il filtro per 'Analista'
-            analisti_orm = self.repository.get_utenti_by_ruolo('Analista') 
-            
-            # Serializzazione (prepara i dati per il frontend)
-            analisti_list = []
-            for analista in analisti_orm:
-                analisti_list.append({
-                    'id': analista.id,
-                    'nome': analista.nome,
-                    'cognome': analista.cognome,
-                })
-            
-            logging.info(f"Recuperati {len(analisti_list)} analisti.")
-            return analisti_list
-        except Exception as e:
-            logging.error(f"Errore Service get_all_analisti: {str(e)}")
-            raise
+    # Aggiungi altri metodi di servizio se necessari per gli utenti

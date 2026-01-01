@@ -1,7 +1,6 @@
 # File: Classi/ClasseCorrettive/Repository_correttiva.py
 # -*- coding: utf-8 -*-
 from sqlalchemy.exc import SQLAlchemyError
-from datetime import datetime, date
 from Classi.ClasseCorrettive.Domain_correttiva import Correttiva
 
 class RepositoryCorrettiva:
@@ -105,58 +104,3 @@ class RepositoryCorrettiva:
         except SQLAlchemyError as e:
             # Rilancia l'errore SQL per la gestione transazionale nel Service
             raise e
-        
-    def update_correttiva(self, session, id_correttiva, dati_update, nome_utente_modifica):
-        """Aggiorna un'azione correttiva esistente."""
-        try:
-            correttiva = session.query(Correttiva).get(id_correttiva)
-            if not correttiva:
-                raise ValueError(f"Correttiva con ID {id_correttiva} non trovata.")
-
-            # --- Aggiornamento dei campi ---
-            
-            # Descrizione: Se è una stringa vuota, solleva errore perché nullable=False
-            if 'descrizione_correttiva' in dati_update and dati_update['descrizione_correttiva']:
-                correttiva.descrizione_correttiva = dati_update['descrizione_correttiva']
-            elif 'descrizione_correttiva' in dati_update and not dati_update['descrizione_correttiva']:
-                # Se il Service ha inviato '' per la descrizione, e questa è obbligatoria, solleviamo errore
-                raise ValueError("Descrizione correttiva è obbligatoria.")
-
-            if 'responsabile' in dati_update:
-                correttiva.responsabile = dati_update['responsabile']
-                
-            # ⭐ PUNTO CRITICO: Gestione sicura della data e check nullability
-            if 'data_scadenza' in dati_update:
-                data_scadenza_str = dati_update['data_scadenza']
-                if data_scadenza_str:
-                    # Esegue la conversione solo se la stringa non è vuota
-                    try:
-                        correttiva.data_scadenza = datetime.strptime(data_scadenza_str, '%Y-%m-%d').date()
-                    except ValueError:
-                        raise ValueError("Formato data scadenza non valido (atteso YYYY-MM-DD).")
-                else:
-                    # Data Scadenza è nullable=False, quindi non possiamo salvarla vuota
-                    raise ValueError("Data scadenza è obbligatoria.")
-
-            if 'stato' in dati_update:
-                correttiva.stato = dati_update['stato'] # L'ORM verifica l'Enum
-                
-            if 'costo' in dati_update:
-                correttiva.costo = dati_update['costo'].lower() == 'true'
-
-            if 'note' in dati_update:
-                correttiva.note = dati_update['note']
-                
-            # Aggiornamento tracciabilità
-            correttiva.modificato_da = nome_utente_modifica
-            
-            session.add(correttiva)
-            return correttiva
-        
-        except SQLAlchemyError as e:
-            session.rollback()
-            # Non mostrare dettagli interni di SQLAlchemy al frontend.
-            raise ValueError(f"Errore di database durante l'aggiornamento.")
-        except Exception as e:
-            # Questo cattura il ValueError sulla data/descrizione e lo rilancia al Controller (che lo trasforma in 400)
-            raise

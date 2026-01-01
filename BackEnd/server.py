@@ -4,6 +4,7 @@ import pprint
 import logging
 import pandas as pd
 import io
+import sys
 from datetime import datetime, date
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -117,6 +118,8 @@ from Classi.ClassePunteggi.Controller_progetto_questionario_punteggio import pun
 from Classi.ClasseCorrettive.Service_correttiva import ServiceCorrettiva 
 from Classi.ClasseCorrettive.Controller_correttiva import correttiva_controller
 
+from Classi.ClasseUtenti.Classe_t_utenti.Controller_t_utenti import t_utenti_controller
+
 # Inizializzazione del logging
 logging.basicConfig(level=logging.INFO)
 
@@ -150,6 +153,7 @@ service_t_risposta.create_table_if_not_exists()
 service_risposta_cliente = ServiceRispostaCliente()
 
 service_punteggi = ServiceProgettoQuestionarioPunteggio()
+sys.modules[__name__].service_punteggi = service_punteggi
 
 
 # Definisci la classe del form di login
@@ -1224,8 +1228,8 @@ def dettaglio_questionario_page(id_progetto_questionario):
     if current_user_role_id is not None:
         dynamic_menu = service_t_funzionalita_utente.build_menu_structure(role_id=current_user_role_id)
 
-    from flask_wtf.csrf import generate_csrf
-    csrf_token = generate_csrf()
+    # from flask_wtf.csrf import generate_csrf
+    # csrf_token = generate_csrf()
     
     # Passa l'ID al template affinché il frontend possa chiamare l'API sopra definita
     return render_template(
@@ -1235,7 +1239,7 @@ def dettaglio_questionario_page(id_progetto_questionario):
         current_user_email=current_user_email,
         current_username=current_username,
         current_user_role_descr=current_user_role_descr,
-        csrf_token=csrf_token,
+       # csrf_token=csrf_token,
         id_progetto_questionario=id_progetto_questionario
     )
 
@@ -1460,6 +1464,8 @@ if __name__ == '__main__':
 
     app.register_blueprint(t_cliente_controller, url_prefix='/api/clienti')
 
+    print("DEBUG: Registrando t_utenti_controller con prefisso /api/utenti")
+    app.register_blueprint(t_utenti_controller, url_prefix='/api/utenti')
 
     print("DEBUG: Registrando risposta_cliente_controller con prefisso /api/risposta_cliente")
     # Il prefisso /api/risposta_cliente è corretto, dato che la rotta nel Controller è /salva_risposte_massive

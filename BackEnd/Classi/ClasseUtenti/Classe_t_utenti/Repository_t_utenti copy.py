@@ -1,5 +1,5 @@
 # Classi/ClasseUtenti/Classe_t_utenti/Repository_t_utenti.py
-from sqlalchemy.orm import sessionmaker, joinedload
+from sqlalchemy.orm import sessionmaker
 from Classi.ClasseDB.db_connection import engine
 from sqlalchemy.exc import SQLAlchemyError
 import logging
@@ -156,29 +156,5 @@ class Repository_t_utenti:
             session.rollback()
             logging.error(f"ERRORE: change_password - Errore durante il cambio password per l'utente '{public_id}': {e}")
             return False
-        finally:
-            session.close()
-
-    # ===============================
-    # 🔹 NUOVO: Recupera utenti per Ruolo
-    # ===============================
-    def get_utenti_by_ruolo(self, ruolo_descr: str):
-        # ession = self.Session()
-        session = self.SessionLocal()
-        try:
-            # Esegue una join tra Utenti e Ruoli e filtra per la descrizione del ruolo
-            utenti = session.query(TUtenti).options(
-                joinedload(TUtenti.ruolo_rel)
-            ).join(TRuolo).filter(
-                TRuolo.DESCR == ruolo_descr,
-                TUtenti.attivo == 1 # Filtra solo gli utenti attivi (assunto)
-            ).order_by(TUtenti.cognome, TUtenti.nome).all()
-            
-            return utenti # Restituisce oggetti ORM
-            
-        except SQLAlchemyError as e:
-            session.rollback()
-            logging.error(f"Errore get_utenti_by_ruolo: {str(e)}")
-            raise
         finally:
             session.close()
