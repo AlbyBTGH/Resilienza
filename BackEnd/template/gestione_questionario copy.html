@@ -1,0 +1,296 @@
+{% extends "index.html" %}
+
+{% block title %}Modifica Questionario{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="p-2 border border-info rounded bg-light mb-3 shadow-sm">
+                <h5 class="text-primary fw-bold mb-0">Gestione Questionari e Domande</h5>
+            </div>
+            <div id="flash-messages-container" class="mt-3">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-primary text-white py-3">
+                    <h5 class="mb-0 fw-normal" id="questionarioTitle">Modifica Questionario: {{ questionario_descr }}</h5>
+                </div>
+                <div class="card-body">
+                    <form id="questionarioModificaForm" method="post">
+                        <!-- ? Aggiunto CSRF token -->
+                        <input type="hidden" name="csrf_token" id="csrf_token" value="{{ csrf_token }}">
+                        <input type="hidden" id="questionarioIdInput" value="{{ questionario_id }}">
+
+                        <div class="mb-3">
+                            <label for="descr" class="form-label form-label-sm">Descrizione Questionario:</label>
+                            <input type="text" class="form-control form-control-sm" id="descr" name="descr" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label form-label-sm">Domande Selezionate:</label>
+                            <ul class="list-group" id="domandeSelezionateContainer"></ul>
+                        </div>
+
+                        <!-- ?? Pulsanti azione -->
+                        <div class="mt-3 d-flex gap-2">
+                            <button type="submit" class="btn btn-success btn-sm">
+                                <i class="fas fa-save me-2"></i>Salva Modifiche
+                            </button>
+                            <a href="/crea_questionario" class="btn btn-secondary btn-sm">
+                                <i class="fas fa-arrow-left me-1"></i>Indietro
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-info text-white py-3">
+                    <h5 class="mb-0 fw-normal">Domande Disponibili</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="driverFilter" class="form-label form-label-sm">Filtra per Driver:</label>
+                        <select class="form-select form-select-sm" id="driverFilter">
+                            <option value="all">Tutti i driver</option>
+                        </select>
+                    </div>
+
+                    <div class="table-responsive small border rounded p-2">
+                        <table id="domandeDisponibiliTable" class="table table-sm table-hover table-striped mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th style="width: 10%;">ID</th>
+                                    <th>Descrizione Domanda</th>
+                                    <th style="width: 25%;">Driver</th>
+                                    <th style="width: 10%;">Azione</th>
+                                </tr>
+                            </thead>
+                            <tbody id="domandeDisponibiliTableBody">
+                                <tr><td colspan="4" class="text-center text-muted">Selezionare un driver o attendere...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', async function() {
+    const questionarioId = "{{ questionario_id }}";
+    const API_URL_QUESTIONARIO = `/api/questionario/${questionarioId}`;
+    const API_URL_DOMANDE = "/api/domande_complete/";
+    const API_URL_DRIVERS = "/api/drivers/";
+
+    const questionarioForm = document.getElementById('questionarioModificaForm');
+    const descrInput = document.getElementById('descr');
+    const questionarioTitle = document.getElementById('questionarioTitle');
+    const domandeTableBody = document.getElementById('domandeDisponibiliTableBody');
+    const domandeSelezionateContainer = document.getElementById('domandeSelezionateContainer');
+    const driverFilter = document.getElementById('driverFilter');
+
+    let domandeSelezionate = [];
+    let allDomande = [];
+
+    function renderDomande() {
+        domandeTableBody.innerHTML = '';
+        const selectedDriverId = driverFilter.value;
+        let domandeDaMostrare = allDomande.filter(d => !domandeSelezionate.some(sd => sd.id === d.id));
+
+        if (selectedDriverId !== "all") {
+            domandeDaMostrare = domandeDaMostrare.filter(d => d.id_driver == selectedDriverId);
+        }
+
+        if (domandeDaMostrare.length === 0) {
+            domandeTableBody.innerHTML = '<tr><td colspan="4">Nessuna domanda disponibile.</td></tr>';
+            return;
+        }
+
+        domandeDaMostrare.forEach(domanda => {
+            const row = document.createElement('tr');
+            const driverDescr = domanda.driver_rel ? domanda.driver_rel.descr : 'N.D.';
+            row.innerHTML = `
+                <td>${domanda.id}</td>
+                <td>${domanda.descr}</td>
+                <td>${driverDescr}</td>
+                <td><button class="btn btn-sm btn-success add-domanda" data-id="${domanda.id}">Aggiungi</button></td>
+            `;
+            domandeTableBody.appendChild(row);
+        });
+
+        document.querySelectorAll('.add-domanda').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const domandaId = parseInt(e.target.dataset.id);
+                const domandaToAdd = allDomande.find(d => d.id === domandaId);
+                if (domandaToAdd) {
+                    domandeSelezionate.push(domandaToAdd);
+                    renderDomande();
+                    renderDomandeSelezionate();
+                }
+            });
+        });
+    }
+
+    function renderDomandeSelezionate() {
+        domandeSelezionateContainer.innerHTML = '';
+        
+        if (domandeSelezionate.length === 0) {
+            domandeSelezionateContainer.innerHTML = '<li class="list-group-item text-muted text-center py-3">Nessuna domanda selezionata.</li>';
+            return;
+        }
+
+        domandeSelezionate.forEach(domanda => {
+            const item = document.createElement('li');
+            // Usiamo border-primary per le domande selezionate
+            item.className = 'list-group-item d-flex justify-content-between align-items-center border-start border-4 border-primary mb-2 shadow-sm';
+            
+            const cat = domanda.categoria_descr || 'N.D.';
+            const drv = domanda.driver_descr || 'N.D.';
+
+            item.innerHTML = `
+                <div class="ms-2">
+                    <div class="fw-bold text-dark">Domanda #${domanda.id}</div>
+                    <div class="text-secondary">${domanda.descr}</div>
+                    <div class="text-muted small mt-1">
+                        <i class="fas fa-folder me-1 text-primary"></i><strong>${cat}</strong> 
+                        <i class="fas fa-chevron-right mx-1" style="font-size: 0.7rem;"></i> 
+                        <span>${drv}</span>
+                    </div>
+                </div>
+                <button class="btn btn-outline-danger btn-sm remove-domanda ms-3" data-id="${domanda.id}" title="Rimuovi domanda">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            `;
+            domandeSelezionateContainer.appendChild(item);
+        });
+
+        // Aggancio dei listener
+        domandeSelezionateContainer.querySelectorAll('.remove-domanda').forEach(button => {
+            button.addEventListener('click', function() {
+                // "this" o "currentTarget" puntano sempre al button anche se clicchi l'icona interna
+                const domandaId = parseInt(this.getAttribute('data-id'));
+                
+                // Filtriamo la lista
+                domandeSelezionate = domandeSelezionate.filter(d => d.id !== domandaId);
+                
+                // Aggiorniamo entrambe le tabelle
+                renderDomande();
+                renderDomandeSelezionate();
+            });
+        });
+    }
+
+    async function loadData() {
+        try {
+            const [questionarioResponse, domandeResponse, driversResponse] = await Promise.all([
+                fetch(API_URL_QUESTIONARIO),
+                fetch(API_URL_DOMANDE),
+                fetch(API_URL_DRIVERS)
+            ]);
+
+            const questionarioData = await questionarioResponse.json();
+            const domandeData = await domandeResponse.json();
+            const driversData = await driversResponse.json();
+
+            questionarioTitle.textContent = `Modifica Questionario: ${questionarioData.descr}`;
+            descrInput.value = questionarioData.descr;
+            domandeSelezionate = questionarioData.domande || [];
+            allDomande = domandeData || [];
+
+            driversData.forEach(driver => {
+                const option = document.createElement('option');
+                option.value = driver.id;
+                
+                // Recuperiamo categoria e descrizione (usando dei valori di default se mancano)
+                const categoria = driver.categoria_descr || "Senza Categoria";
+                const nomeDriver = driver.descr || "N.D.";
+                
+                // Formattiamo il testo della tendina
+                option.textContent = `${categoria} || ${nomeDriver}`; 
+                
+                driverFilter.appendChild(option);
+            });
+
+            renderDomande();
+            renderDomandeSelezionate();
+
+        } catch (error) {
+            console.error("? Errore nel caricamento dei dati:", error);
+        }
+    }
+
+    driverFilter.addEventListener('change', renderDomande);
+
+    questionarioForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const csrfToken = document.getElementById('csrf_token')?.value || null;
+
+        const data = {
+            descr: descrInput.value,
+            domande: domandeSelezionate.map(d => d.id),
+            modificato_da: "{{ session.get('username', 'Utente Sconosciuto') }}"
+        };
+
+        console.log("?? Invio dati PUT:", data);
+
+        try {
+            const response = await fetch(API_URL_QUESTIONARIO, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {})
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+            console.log("?? Risposta server:", result);
+
+            if (response.ok) {
+                showFlashMessage('? Questionario aggiornato con successo!', 'success');
+            } else {
+                showFlashMessage(`? Errore: ${result.error || response.statusText}`, 'danger');
+            }
+        } catch (error) {
+            console.error("?? Errore nella richiesta PUT:", error);
+            showFlashMessage(`Errore di rete: ${error.message}`, 'danger');
+        }
+    });
+
+    loadData();
+});
+
+function showFlashMessage(message, category) {
+    const container = document.getElementById('flash-messages-container');
+    if (!container) return;
+    const alertHtml = `
+        <div class="alert alert-${category} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+    container.innerHTML = alertHtml;
+}
+</script>
+{% endblock %}

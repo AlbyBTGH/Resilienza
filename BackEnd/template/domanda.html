@@ -4,6 +4,29 @@
 
 {% block head_extra %}
     <style>
+        /* Riduce il font della tendina e gestisce la larghezza */
+        .form-select, .form-control {
+            font-size: 0.85rem !important; /* Font più piccolo */
+        }
+
+        /* Specifico per le opzioni della tendina */
+        select option {
+            font-size: 0.85rem;
+            /* Alcuni browser permettono di limitare la larghezza qui */
+            max-width: 400px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Se la tendina intera è troppo larga, forziamo il contenitore */
+        #idDriver {
+            max-width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+
         /* Stile per ridurre la dimensione del font nella tabella delle domande */
         #domandeTable th,
         #domandeTable td {
@@ -113,8 +136,8 @@
                     <thead>
                         <tr>
                             <th scope="col" style="width: 5%;">ID</th>
-                            <th scope="col" style="width: 50%;">Domanda</th>
-                            <th scope="col" style="width: 20%;">Driver</th>
+                            <th scope="col" style="width: 35%;">Domanda</th>
+                            <th scope="col" style="width: 15%;">Categoria</th> <th scope="col" style="width: 20%;">Driver</th>
                             <th scope="col" style="width: 15%;">Gruppo Risposta</th>
                             <th scope="col" style="width: 10%;">Azioni</th>
                         </tr>
@@ -178,39 +201,59 @@
         async function loadDriversForDropdowns() {
             try {
                 const response = await fetch(DRIVER_API_URL);
-                if (!response.ok) {
-                    // Genera un errore che include lo status HTTP
-                    throw new Error(`API Driver status: ${response.status}`);
-                }
+                if (!response.ok) throw new Error(`API status: ${response.status}`);
+                
                 const drivers = await response.json();
 
-                // Funzione interna per popolare un dropdown specifico
                 const populateDropdown = (selectElement, isFilter) => {
-                    // Controlla per 'null' o 'undefined' prima di procedere
-                    if (!selectElement) {
-                        return;
-                    }
+                    if (!selectElement) return;
                     
                     let options = isFilter 
                         ? '<option value="">Tutti i Driver</option>'
                         : '<option value="">Seleziona un Driver</option>'; 
 
-                    drivers.forEach(driver => {
-                        options += `<option value="${driver.id}">${driver.descr}</option>`;
+                    // --- NUOVO: Ordiniamo per Categoria, poi per Driver ---
+                    drivers.sort((a, b) => {
+                        const catA = (a.categoria_descr || "").toLowerCase();
+                        const catB = (b.categoria_descr || "").toLowerCase();
+                        return catA.localeCompare(catB) || a.descr.localeCompare(b.descr);
                     });
+
+                    // --- COSTRUZIONE VISIVA DELLA LOV ---
+                    // drivers.forEach(driver => {
+                    //     const categoria = driver.categoria_descr ? driver.categoria_descr.toUpperCase() : 'N.D.';
+                        // Risultato visivo: CATEGORIA || Nome Driver
+                    //     const label = `${categoria} || ${driver.descr}`;
+                        
+                        // Il 'value' rimane l'ID numerico del driver (non rompe il salvataggio)
+                    //     options += `<option value="${driver.id}">${label}</option>`;
+                    // });
+                    drivers.forEach(driver => {
+                        // 1. Rendiamo la categoria più corta (es: solo i primi 12 caratteri)
+                        let cat = driver.categoria_descr ? driver.categoria_descr.toUpperCase() : 'N.D.';
+                        if (cat.length > 15) cat = cat.substring(0, 12) + '...';
+
+                        // 2. Usiamo un separatore più sottile (un semplice pipe |) 
+                        // e limitiamo la lunghezza totale se necessario
+                        let fullLabel = `${cat} | ${driver.descr}`;
+                        
+                        // 3. Se la descrizione del driver è lunghissima, la tagliamo nel dropdown
+                        if (fullLabel.length > 80) {
+                            fullLabel = fullLabel.substring(0, 77) + '...';
+                        }
+
+                        options += `<option value="${driver.id}" title="${driver.categoria_descr} | ${driver.descr}">${fullLabel}</option>`;
+                    });
+                    
                     selectElement.innerHTML = options;
                 };
 
-                // Popola il dropdown del form (richiesto)
                 populateDropdown(idDriverSelect, false);
-                // Popola il dropdown del filtro (opzionale)
                 populateDropdown(filterDriverSelect, true);
 
             } catch (error) {
-                // ✅ CORREZIONE: Mostra l'errore dettagliato (incluso lo status HTTP)
-                const errorMessage = error.message.includes('status:') ? error.message : "Errore di rete o JSON non valido";
                 console.error("Errore nel caricamento dei Driver:", error);
-                showFlashMessage(`Errore critico nel caricamento dei Driver: ${errorMessage}`, 'danger');
+                showFlashMessage("Errore nel caricamento della lista Driver", 'danger');
             }
         }
 
@@ -249,12 +292,12 @@
         
         // Caricamento delle Domande nella tabella
         async function loadDomande() {
-            domandeTableBody.innerHTML = '<tr><td colspan="5" class="text-center">Caricamento in corso...</td></tr>';
+            // 1. AGGIORNATO: colspan="6"
+            domandeTableBody.innerHTML = '<tr><td colspan="6" class="text-center">Caricamento in corso...</td></tr>';
             
             const selectedDriverId = filterDriverSelect.value;
             let url = DOMANDA_API_URL;
             if (selectedDriverId) {
-                // Modifica l'URL per includere il filtro
                 url += `?id_driver_filter=${selectedDriverId}`;
             }
 
@@ -267,17 +310,20 @@
                 
                 let rows = '';
                 if (domande.length === 0) {
-                    rows = '<tr><td colspan="5" class="text-center">Nessuna domanda trovata per i criteri selezionati.</td></tr>';
+                    // 2. AGGIORNATO: colspan="6"
+                    rows = '<tr><td colspan="6" class="text-center">Nessuna domanda trovata per i criteri selezionati.</td></tr>';
                 } else {
                     domande.forEach(domanda => {
-                        // const driverDescr = domanda.driver ? domanda.driver.descr : 'N/D';
                         const driverDescr = domanda.descr_driver || 'N/D';
-                        const gruppoRispostaDescr = domanda.gruppo_risposta ? domanda.gruppo_risposta.descr : '-';
+                        // 3. NUOVO: Recuperiamo categoria_descr inviato dal Repository
+                        const categoriaDescr = domanda.categoria_descr || 'N/D'; 
+                        const gruppoRispostaDescr = domanda.descr_gruppo_risposta || '-';
                         
                         rows += `
                             <tr>
                                 <td>${domanda.id}</td>
                                 <td>${domanda.descr}</td>
+                                <td><span class="badge bg-light text-dark border">${categoriaDescr}</span></td>
                                 <td>${driverDescr}</td>
                                 <td>${gruppoRispostaDescr}</td>
                                 <td class="action-btns">

@@ -8,7 +8,7 @@
         <div class="col-12">
             
             <div class="p-2 border border-info rounded bg-light mb-3 shadow-sm">
-                <h5 class="text-primary fw-bold mb-0">Gestione Questionari e Domande</h5>
+                <h5 class="text-primary fw-bold mb-0">Gestione Template Questionari</h5>
             </div>
             
             <div id="flash-messages-container" class="mt-3">
@@ -95,10 +95,13 @@
     </div>
     
     <div class="row">
-        <div class="col-12 mb-4">
+        <div class="col-12 mb-4" id="lista-template">
             <div class="card shadow-sm">
-                <div class="card-header bg-secondary text-white py-3">
-                    <h5 class="mb-0 fw-normal">Questionari Esistenti</h5>
+                <div class="card-header bg-secondary text-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-normal">Template Questionari</h5>
+                    <button class="btn btn-light btn-sm fw-bold shadow-sm" onclick="scrollToCreateForm()">
+                        <i class="fas fa-plus-circle me-1"></i> Crea Nuovo Template
+                    </button>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive small">
@@ -165,12 +168,22 @@
         }
 
         function renderDriversFilter(drivers) {
-            driverFilter.innerHTML = '<option value="all">Tutti i driver</option>';
+            // Testo predefinito più esplicativo
+            driverFilter.innerHTML = '<option value="all">Tutti i driver (Filtra per Categoria || Driver)</option>';
+            
             if (Array.isArray(drivers)) {
                 drivers.forEach(driver => {
                     const option = document.createElement('option');
                     option.value = driver.id; 
-                    option.textContent = driver.descr;
+                    
+                    // ⭐ RECUPERO DEI DATI:
+                    // Usiamo 'categoria_descr' (o il nome inviato dalla tua API) e 'descr'
+                    const cat = driver.categoria_descr || "Senza Categoria";
+                    const drv = driver.descr || "N.D.";
+                    
+                    // Impostiamo il testo nel formato richiesto
+                    option.textContent = `${cat} || ${drv}`;
+                    
                     driverFilter.appendChild(option);
                 });
             }
@@ -360,6 +373,48 @@
             loadDomande(); 
         });
         loadAndRenderQuestionariList(); 
+
+        Promise.all([
+            loadDrivers().then(() => loadDomande()),
+            loadAndRenderQuestionariList()
+        ]).then(() => {
+            // Usiamo requestAnimationFrame per assicurarci che il DOM sia pronto
+            requestAnimationFrame(() => {
+                const target = document.getElementById('lista-template');
+                if (target) {
+                    // Calcoliamo la posizione dell'elemento rispetto al documento
+                    const rect = target.getBoundingClientRect();
+                    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                    const finalY = rect.top + scrollTop;
+
+                    // Salto immediato (0ms di animazione)
+                    window.scrollTo({
+                        top: finalY,
+                        behavior: 'instant' // Forza il salto immediato
+                    });
+
+                    // Se 'instant' non fosse supportato dal browser, usiamo il metodo classico
+                    window.scrollTo(0, finalY);
+                }
+            });
+        });  
+
     });
+
+/**
+ * Esegue lo scroll fluido verso il form di creazione a inizio pagina
+ */
+function scrollToCreateForm() {
+    const createForm = document.getElementById('questionarioForm');
+    if (createForm) {
+        createForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        // Opzionale: mette il focus sul primo campo del form
+        const descrInput = document.getElementById('descr');
+        if (descrInput) {
+            setTimeout(() => descrInput.focus(), 800);
+        }
+    }
+}
 </script>
 {% endblock %}

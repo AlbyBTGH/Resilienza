@@ -125,7 +125,7 @@ class RepositoryCorrettiva:
             if 'responsabile' in dati_update:
                 correttiva.responsabile = dati_update['responsabile']
                 
-            # ⭐ PUNTO CRITICO: Gestione sicura della data e check nullability
+            # Gestione sicura della data e check nullability
             if 'data_scadenza' in dati_update:
                 data_scadenza_str = dati_update['data_scadenza']
                 if data_scadenza_str:
@@ -142,7 +142,13 @@ class RepositoryCorrettiva:
                 correttiva.stato = dati_update['stato'] # L'ORM verifica l'Enum
                 
             if 'costo' in dati_update:
-                correttiva.costo = dati_update['costo'].lower() == 'true'
+                valore_costo = dati_update['costo']
+                if isinstance(valore_costo, bool):
+                    correttiva.costo = valore_costo
+                elif isinstance(valore_costo, str):
+                    correttiva.costo = valore_costo.lower() == 'true'
+                else:
+                    correttiva.costo = bool(valore_costo)
 
             if 'note' in dati_update:
                 correttiva.note = dati_update['note']

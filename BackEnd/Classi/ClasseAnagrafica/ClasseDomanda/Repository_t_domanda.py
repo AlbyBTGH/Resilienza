@@ -28,53 +28,34 @@ class Repository_t_domanda:
             session.close()
 
     def _domanda_to_dict(self, domanda: TDomanda) -> dict:
-        """
-        Converte un oggetto TDomanda in un dizionario. 
-        Implementa una diagnostica robusta per la descrizione del Driver.
-        """
-        driver_descr = "N/D (Relazione non Caricata)" # Default se tutto fallisce
+        driver_descr = "N/D"
+        categoria_descr = "N/D" 
 
         if domanda.driver_rel:
-            try:
-                # ✅ ACCESSO DEFINITIVO ALL'ATTRIBUTO CORRETTO 'descr'
-                desc = domanda.driver_rel.descr
-                if desc:
-                    driver_descr = desc
-                else:
-                    driver_descr = f"Driver ID {domanda.id_driver} (NOME VUOTO NEL DB)"
-                    
-            except AttributeError as e:
-                # Questo non dovrebbe succedere con i Domain forniti, ma gestiamo l'errore
-                driver_descr = f"Driver ID {domanda.id_driver} (ERRORE DI ATTRIBUTO: {e})"
-                logging.error(f"Impossibile accedere all'attributo descr: {e}")
-        else:
-            # Caso in cui driver_rel è None (il problema attuale)
-            driver_descr = f"Driver ID {domanda.id_driver} (Relazione NON CARICATA/NULL)"
-            logging.warning(f"Relazione driver_rel mancante per la domanda ID {domanda.id}. Controlla i modelli e il joinedload.")
-
-        # --- LOGICA GRUPPO RISPOSTA ---
-        gruppo_risposta_descr = domanda.gruppo_risposta_rel.descr if domanda.gruppo_risposta_rel else None
+            driver_descr = domanda.driver_rel.descr or f"Driver ID {domanda.id_driver}"
+            # Accedo a .categoria (come definito nel Domain_t_driver.py)
+            if domanda.driver_rel.categoria:
+                categoria_descr = domanda.driver_rel.categoria.descr
         
         data = {
             'id': domanda.id,
             'descr': domanda.descr,
             'id_driver': domanda.id_driver,
-            'data_ultima_modifica': domanda.data_ultima_modifica.isoformat() if domanda.data_ultima_modifica else None,
-            'modificato_da': domanda.modificato_da,
-            # Dettagli del Driver (usiamo la descrizione recuperata)
             'descr_driver': driver_descr,
-            # NUOVI CAMPI DEL GRUPPO DI RISPOSTA
+            'categoria_descr': categoria_descr, 
             'id_gruppo_risposta': domanda.id_gruppo_risposta,
-            'descr_gruppo_risposta': gruppo_risposta_descr,
+            'descr_gruppo_risposta': domanda.gruppo_risposta_rel.descr if domanda.gruppo_risposta_rel else None,
+            'modificato_da': domanda.modificato_da,
+            'data_ultima_modifica': domanda.data_ultima_modifica.isoformat() if domanda.data_ultima_modifica else None,
         }
         return data
 
     def get_all(self, id_driver_filter: int = None):
         session = self.Session()
         try:
-            # 💡 ASSICURATI che il joinedload sia attivo e funzioni
+            # ✅ Carichiamo le relazioni dirette della Domanda
             query = session.query(TDomanda).options(
-                joinedload(TDomanda.driver_rel),
+                joinedload(TDomanda.driver_rel).joinedload(TDriver.categoria),
                 joinedload(TDomanda.gruppo_risposta_rel) 
             )
 
@@ -82,6 +63,9 @@ class Repository_t_domanda:
                 query = query.filter(TDomanda.id_driver == id_driver_filter)
             
             domande_db = query.all()
+            # Se domande_db è vuoto, il problema potrebbe essere nel filtro
+            logging.info(f"Query DB completata. Trovate {len(domande_db)} righe.")
+            
             domande_data = [self._domanda_to_dict(domanda) for domanda in domande_db]
             return domande_data
 

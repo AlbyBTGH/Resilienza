@@ -118,6 +118,8 @@ from Classi.ClassePunteggi.Controller_progetto_questionario_punteggio import pun
 from Classi.ClasseCorrettive.Service_correttiva import ServiceCorrettiva 
 from Classi.ClasseCorrettive.Controller_correttiva import correttiva_controller
 
+from Classi.ClasseUtenti.Classe_t_utenti.Controller_t_utenti import t_utenti_controller
+
 # Inizializzazione del logging
 logging.basicConfig(level=logging.INFO)
 
@@ -435,6 +437,37 @@ def domanda_page():
         csrf_token=csrf_token
     )
 
+
+# rotta per la pagina di SOLA FRUIZIONE Domande (layout piu efficiente)
+@appBT.route("/fruizione_domande")
+@login_required
+def fruizione_domande_page():
+    """
+    Renderizza la pagina di visualizzazione moderna e raggruppata delle domande.
+    """
+    current_user_role_id = session.get('user_role_id')
+    current_user_email = session.get('user_email')
+    current_username = session.get('username')
+    current_user_role_descr = session.get('user_role_descr')
+
+    dynamic_menu = []
+    if current_user_role_id is not None:
+        dynamic_menu = service_t_funzionalita_utente.build_menu_structure(role_id=current_user_role_id)
+
+    from flask_wtf.csrf import generate_csrf
+    csrf_token = generate_csrf() 
+    
+    return render_template(
+        "fruizione_domande.html",
+        title="Esplora Catalogo Domande",
+        menu_data=dynamic_menu,
+        current_user_email=current_user_email,
+        current_username=current_username,
+        current_user_role_descr=current_user_role_descr,
+        csrf_token=csrf_token
+    )
+
+
 # ### INIZIO AGGIUNTA PER GRUPPO_RISPOSTA ###
 @appBT.route("/gruppo_risposta")
 @login_required
@@ -652,33 +685,37 @@ def associa_questionario_progetto_page():
 def get_questionario_by_id(questionario_id):
     db_session = SessionLocal()
     try:
-        # Carica il questionario e le sue domande in un'unica query
-        # Utilizza l'alias corretto per la relazione
+        # Caricamento gerarchico: Domanda -> Driver -> Categoria
         questionario = db_session.query(TQuestionario).options(
             joinedload(TQuestionario.domande)
+                .joinedload(TDomanda.driver_rel)
+                .joinedload(TDriver.categoria) # Usiamo 'categoria' come definito nel tuo relationship
         ).filter(TQuestionario.id == questionario_id).one_or_none()
 
         if not questionario:
             return jsonify({'error': 'Questionario non trovato'}), 404
 
-        # Aggiungi un log per verificare se le domande sono state caricate
-        print(f"DEBUG: Trovate {len(questionario.domande)} domande per il questionario {questionario_id}")
+        domande_selezionate = []
+        for d in questionario.domande:
+            # Recuperiamo le descrizioni risalendo la catena
+            # d.driver_rel -> istanza di TDriver
+            # d.driver_rel.categoria -> istanza di TCategoria
+            cat_descr = d.driver_rel.categoria.descr if (d.driver_rel and d.driver_rel.categoria) else "N.D."
+            driver_descr = d.driver_rel.descr if d.driver_rel else "N.D."
 
-        # Serializzazione dei dati del questionario, inclusa la lista di domande
-        domande_selezionate = [
-            {'id': d.id, 'descr': d.descr} for d in questionario.domande
-        ]
+            domande_selezionate.append({
+                'id': d.id,
+                'descr': d.descr,
+                'categoria_descr': cat_descr,
+                'driver_descr': driver_descr
+            })
         
-        questionario_data = {
+        return jsonify({
             'id': questionario.id,
             'descr': questionario.descr,
-            'domande': domande_selezionate,
-        }
-
-        return jsonify(questionario_data), 200
-
+            'domande': domande_selezionate
+        }), 200
     except Exception as e:
-        print(f"ERRORE: Errore nel recupero del questionario: {e}")
         return jsonify({'error': str(e)}), 500
     finally:
         db_session.close()
@@ -712,23 +749,30 @@ def get_all_domande():
 @appBT.route('/api/domande_complete/', methods=['GET'])
 @login_required
 def get_domande_complete():
-    """API per recuperare tutte le domande, incluse le informazioni complete sul driver, per il frontend."""
     session = SessionLocal()
     try:
-        domande = session.query(TDomanda).options(joinedload(TDomanda.driver_rel)).all()
+        # Carichiamo anche la categoria associata al driver
+        domande = session.query(TDomanda).options(
+            joinedload(TDomanda.driver_rel).joinedload(TDriver.categoria)
+        ).all()
         
-        domande_list = [
-            {
-                'id': domanda.id,
-                'descr': domanda.descr,
-                'id_driver': domanda.id_driver,
-                'driver_rel': {'id': domanda.driver_rel.id, 'descr': domanda.driver_rel.descr} if domanda.driver_rel else None
-            }
-            for domanda in domande
-        ]
+        domande_list = []
+        for d in domande:
+            domande_list.append({
+                'id': d.id,
+                'descr': d.descr,
+                'id_driver': d.id_driver,
+                # Inseriamo qui i nomi testuali per il frontend
+                'driver_descr': d.driver_rel.descr if d.driver_rel else "N.D.",
+                'categoria_descr': d.driver_rel.categoria.descr if (d.driver_rel and d.driver_rel.categoria) else "N.D.",
+                # Manteniamo l'oggetto originale se serve ad altre funzioni
+                'driver_rel': {
+                    'id': d.driver_rel.id, 
+                    'descr': d.driver_rel.descr
+                } if d.driver_rel else None
+            })
         return jsonify(domande_list), 200
     except Exception as e:
-        print(f"ERRORE: Errore nel recupero delle domande: {e}")
         return jsonify({'error': str(e)}), 500
     finally:
         session.close()
@@ -1226,8 +1270,8 @@ def dettaglio_questionario_page(id_progetto_questionario):
     if current_user_role_id is not None:
         dynamic_menu = service_t_funzionalita_utente.build_menu_structure(role_id=current_user_role_id)
 
-    from flask_wtf.csrf import generate_csrf
-    csrf_token = generate_csrf()
+    # from flask_wtf.csrf import generate_csrf
+    # csrf_token = generate_csrf()
     
     # Passa l'ID al template affinché il frontend possa chiamare l'API sopra definita
     return render_template(
@@ -1237,9 +1281,42 @@ def dettaglio_questionario_page(id_progetto_questionario):
         current_user_email=current_user_email,
         current_username=current_username,
         current_user_role_descr=current_user_role_descr,
-        csrf_token=csrf_token,
+       # csrf_token=csrf_token,
         id_progetto_questionario=id_progetto_questionario
     )
+
+# ============================================
+# Rotta Pagina: Dettaglio Report Progetto-Questionario (VERSIONE V2)
+# ============================================
+@appBT.route("/report/dettaglio_questionario_v2/<int:id_progetto_questionario>", methods=['GET'])
+@login_required
+def dettaglio_questionario_v2_page(id_progetto_questionario):
+    """
+    Renderizza la versione V2 (organizzata per categorie) della pagina 
+    per visualizzare il report di dettaglio.
+    """
+    # Logica standard per il menu dinamico e sessione
+    current_user_role_id = session.get('user_role_id')
+    current_user_email = session.get('user_email')
+    current_username = session.get('username')
+    current_user_role_descr = session.get('user_role_descr')
+
+    dynamic_menu = []
+    if current_user_role_id is not None:
+        dynamic_menu = service_t_funzionalita_utente.build_menu_structure(role_id=current_user_role_id)
+
+    # Nota: Assicurati che il file si chiami esattamente dettaglio_questionario_report_v2.html
+    return render_template(
+        "dettaglio_questionario_report_v2.html", 
+        title=f"Questionario Cliente V2 - ID: {id_progetto_questionario}",
+        menu_data=dynamic_menu,
+        current_user_email=current_user_email,
+        current_username=current_username,
+        current_user_role_descr=current_user_role_descr,
+        id_progetto_questionario=id_progetto_questionario
+    )
+
+
 
 
 
@@ -1462,6 +1539,8 @@ if __name__ == '__main__':
 
     app.register_blueprint(t_cliente_controller, url_prefix='/api/clienti')
 
+    print("DEBUG: Registrando t_utenti_controller con prefisso /api/utenti")
+    app.register_blueprint(t_utenti_controller, url_prefix='/api/utenti')
 
     print("DEBUG: Registrando risposta_cliente_controller con prefisso /api/risposta_cliente")
     # Il prefisso /api/risposta_cliente è corretto, dato che la rotta nel Controller è /salva_risposte_massive

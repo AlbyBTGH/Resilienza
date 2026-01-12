@@ -51,73 +51,64 @@ class RepositoryProgettoQuestionario:
 
     # --- METODO AGGIORNATO PER IL DETTAGLIO REPORT CON RISPOSTE SALVATE (FILTRO UTENTE) ---
     # 🟢 MODIFICA 1: Aggiunta di nome_utente_autore alla firma del metodo
-    def get_dettaglio_domande_risposte(self, id_progetto_questionario: int, nome_utente_autore: str):
+    def get_dettaglio_domande_risposte(self, id_progetto_questionario, nome_utente_autore):
         """
-        Recupera le domande, le risposte possibili e la risposta salvata
-        dall'utente loggato (nome_utente_autore) per un ProgettoQuestionario.
+        Recupera le domande, le risposte possibili e l'eventuale risposta già salvata
+        dall'utente specifico per un dato progetto_questionario.
+        Include ora il nome della CATEGORIA per il raggruppamento.
         """
         session = self.Session()
         try:
-            # Query che recupera: Associazione Domanda, Domanda, Risposte Possibili e Risposta Salvata (RC FILTRATA)
-            sql_query = text("""
-                SELECT
-                    PQD.ID AS ID_ASSOCIAZIONE,
-                    D.ID AS ID_DOMANDA,
-                    D.DESCR AS TESTO_DOMANDA,
-                    -- Utilizza l'ID GRUPPO RISPOSTA dalla tabella di associazione
-                    PQD.ID_GRUPPO_RISPOSTA AS ID_GRUPPO_RISPOSTA,
-                    R.ID_RISPOSTA AS ID_RISPOSTA_POSSIBILE,
-                    R.DESCR_RISPOSTA AS DESCR_RISPOSTA_POSSIBILE,
-                    R.PESO AS PESO_RISPOSTA_POSSIBILE,
-                    -- Campo chiave per la pre-selezione. È NULL se non c'è risposta salvata da QUESTO utente.
-                    RC.ID_RISPOSTA AS ID_RISPOSTA_SALVATA
-                FROM
-                    progetto_questionario_domanda PQD
-                JOIN
-                    domande D ON PQD.ID_DOMANDA = D.ID
-                -- JOIN per collegare le risposte possibili
-                LEFT JOIN
-                    gruppo_risposta_risposta GRR ON PQD.ID_GRUPPO_RISPOSTA = GRR.ID_GRUPPO_RISPOSTA
-                LEFT JOIN
-                    risposta R ON GRR.ID_RISPOSTA = R.ID_RISPOSTA
-                LEFT JOIN
-                    risposta_cliente RC 
-                    ON RC.ID_PROGETTO_QUESTIONARIO_DOMANDA = PQD.ID
-                    -- 🟢 MODIFICA 2: Filtra la risposta cliente SOLO per l'utente loggato
-                    AND RC.MODIFICATO_DA = :nome_utente_autore
-                    
-                WHERE
-                    PQD.ID_PROGETTO_QUESTIONARIO = :id_pq
-                ORDER BY
-                    PQD.ID, R.ID_RISPOSTA
+            # Query SQL Raw per gestire i JOIN complessi e la risposta dell'utente
+            query = text("""
+                SELECT 
+                    pqd.ID AS ID_ASSOCIAZIONE,
+                    d.ID AS ID_DOMANDA,
+                    d.DESCR AS TESTO_DOMANDA,
+                    dr.DESCR AS DRIVER_DESCR,
+                    c.DESCR AS CATEGORIA_DESCR,  
+                    pqd.ID_GRUPPO_RISPOSTA AS ID_GRUPPO_RISPOSTA,
+                    r.ID_RISPOSTA AS ID_RISPOSTA_POSSIBILE,
+                    r.DESCR_RISPOSTA AS DESCR_RISPOSTA_POSSIBILE,
+                    r.PESO AS PESO_RISPOSTA_POSSIBILE,
+                    rc.ID_RISPOSTA AS ID_RISPOSTA_SALVATA
+                FROM progetto_questionario_domanda pqd
+                JOIN domande d ON pqd.ID_DOMANDA = d.ID
+                JOIN driver dr ON d.ID_DRIVER = dr.ID        -- JOIN AL DRIVER
+                JOIN categoria c ON dr.ID_CATEGORIA = c.ID   -- JOIN ALLA CATEGORIA
+                LEFT JOIN gruppo_risposta_risposta grr ON pqd.ID_GRUPPO_RISPOSTA = grr.ID_GRUPPO_RISPOSTA
+                LEFT JOIN risposta r ON grr.ID_RISPOSTA = r.ID_RISPOSTA
+                LEFT JOIN risposta_cliente rc ON rc.ID_PROGETTO_QUESTIONARIO_DOMANDA = pqd.ID 
+                     AND rc.MODIFICATO_DA = :nome_utente_autore
+                WHERE pqd.ID_PROGETTO_QUESTIONARIO = :id_pq
+                ORDER BY c.DESCR, pqd.ID, r.ID_RISPOSTA
             """)
-            
-            # 🟢 MODIFICA 3: Passa entrambi i parametri all'esecuzione della query
-            result = session.execute(sql_query, {
-                "id_pq": id_progetto_questionario,
-                "nome_utente_autore": nome_utente_autore 
+
+            result = session.execute(query, {
+                'id_pq': id_progetto_questionario,
+                'nome_utente_autore': nome_utente_autore
             })
-            
+
             dettaglio_domande = {}
 
             for row in result:
                 id_associazione = row.ID_ASSOCIAZIONE
                 
-                # 1. Inizializza la struttura della domanda/associazione
+                # 1. Se è la prima volta che incontriamo questa domanda, creiamo l'oggetto
                 if id_associazione not in dettaglio_domande:
                     dettaglio_domande[id_associazione] = {
                         'id_associazione': id_associazione,
                         'id_domanda': row.ID_DOMANDA,
                         'testo': row.TESTO_DOMANDA,
+                        'driver_descr': row.DRIVER_DESCR,
+                        'categoria_descr': row.CATEGORIA_DESCR,
                         'gruppo_risposta_id': row.ID_GRUPPO_RISPOSTA,
-                        # ID della risposta salvata da QUESTO utente (sarà NULL se non ha risposto)
                         'risposta_salvata_id': row.ID_RISPOSTA_SALVATA, 
                         'risposte_possibili': []
                     }
                 
-                # 2. Aggiunge le risposte possibili
+                # 2. Aggiunge le risposte possibili (evitando duplicati)
                 if row.ID_RISPOSTA_POSSIBILE is not None:
-                    # Evita duplicati nella lista risposte_possibili (causati dal join con RC)
                     risposta_ids = [r['id'] for r in dettaglio_domande[id_associazione]['risposte_possibili']]
                     if row.ID_RISPOSTA_POSSIBILE not in risposta_ids:
                         dettaglio_domande[id_associazione]['risposte_possibili'].append({
@@ -126,11 +117,11 @@ class RepositoryProgettoQuestionario:
                             'peso': float(row.PESO_RISPOSTA_POSSIBILE) if row.PESO_RISPOSTA_POSSIBILE else None
                         })
             
-            # Ritorna la lista strutturata
             return list(dettaglio_domande.values())
             
         except SQLAlchemyError as e:
-            logging.error(f"Errore SQL nel recupero dettaglio questionario: {e}")
-            raise
+            logging.error(f"Errore query dettaglio report: {str(e)}")
+            session.rollback()
+            raise e
         finally:
             session.close()

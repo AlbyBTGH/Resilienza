@@ -1,0 +1,207 @@
+{% extends "index.html" %}
+
+{% block title %}Esplora Domande{% endblock title %}
+
+{% block head_extra %}
+<style>
+    .category-card {
+        transition: transform 0.2s;
+        border: none;
+        border-radius: 12px;
+    }
+    .category-card:hover {
+        transform: translateY(-5px);
+    }
+    .driver-header {
+        background-color: #f8f9fa;
+        font-weight: 600;
+        color: #495057;
+    }
+    .question-item {
+        border-left: 3px solid #0d6efd;
+        margin-bottom: 5px;
+        background-color: #fff;
+        transition: background-color 0.2s;
+    }
+    .question-item:hover {
+        background-color: #f1f7ff;
+    }
+    .badge-count {
+        font-size: 0.75rem;
+        vertical-align: middle;
+    }
+    .search-container {
+        max-width: 600px;
+        margin: 0 auto 2rem auto;
+    }
+</style>
+{% endblock head_extra %}
+
+{% block content %}
+<div class="text-center mb-5">
+    <h2 class="display-6 fw-bold">Catalogo Domande</h2>
+    <p class="text-muted">Naviga tra le categorie e i driver per consultare le domande censite.</p>
+    
+    <div class="mb-4">
+        <button onclick="exportToExcel()" class="btn btn-outline-success btn-sm me-2 shadow-sm">
+            <i class="fas fa-file-excel me-1"></i> Esporta Excel
+        </button>
+        <button onclick="exportToPDF()" class="btn btn-outline-danger btn-sm shadow-sm">
+            <i class="fas fa-file-pdf me-1"></i> Esporta PDF
+        </button>
+    </div>
+    
+    <div class="search-container">
+        <div class="input-group shadow-sm">
+            <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
+            <input type="text" id="globalSearch" class="form-control border-start-0" placeholder="Cerca parola chiave, driver o categoria...">
+        </div>
+    </div>
+</div>
+
+    <div id="fruizioneContainer" class="row">
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p>Ottimizzazione visualizzazione in corso...</p>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+<script>
+    let allDomande = []; // Variabile globale per l'export
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const container = document.getElementById('fruizioneContainer');
+        const searchInput = document.getElementById('globalSearch');
+
+        async function init() {
+            try {
+                const response = await fetch('/api/domanda/');
+                allDomande = await response.json();
+                renderFruizione(allDomande);
+            } catch (error) {
+                container.innerHTML = `<div class="alert alert-danger">Errore nel caricamento: ${error.message}</div>`;
+            }
+        }
+
+        function renderFruizione(data) {
+            const tree = raggruppaDati(data);
+            container.innerHTML = '';
+
+            Object.keys(tree).sort().forEach(catName => {
+                const drivers = tree[catName];
+                const catId = catName.replace(/\W/g, '_');
+                
+                let cardHtml = `
+                    <div class="col-xl-4 col-md-6 mb-4">
+                        <div class="card category-card shadow-sm h-100">
+                            <div class="card-header bg-white border-0 pt-3">
+                                <h5 class="card-title fw-bold text-primary mb-0">
+                                    <i class="fas fa-layer-group me-2"></i>${catName}
+                                </h5>
+                                <hr class="my-2">
+                            </div>
+                            <div class="card-body pt-0">
+                                <div class="accordion accordion-flush" id="acc-${catId}">`;
+
+                Object.keys(drivers).sort().forEach((drvName, index) => {
+                    const drvId = `${catId}_${index}`;
+                    const questions = drivers[drvName];
+                    cardHtml += `
+                        <div class="accordion-item border-0 mb-2 shadow-sm rounded">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed rounded driver-header" type="button" 
+                                        data-bs-toggle="collapse" data-bs-target="#collapse${drvId}">
+                                    <span class="me-auto">${drvName}</span>
+                                    <span class="badge bg-primary rounded-pill ms-2">${questions.length}</span>
+                                </button>
+                            </h2>
+                            <div id="collapse${drvId}" class="accordion-collapse collapse" data-bs-parent="#acc-${catId}">
+                                <div class="accordion-body p-2">
+                                    <div class="list-group list-group-flush">
+                                        ${questions.map(q => `<div class="list-group-item question-item p-2 small">${q.descr}</div>`).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`;
+                });
+
+                cardHtml += `</div></div></div></div>`;
+                container.innerHTML += cardHtml;
+            });
+        }
+
+        searchInput.addEventListener('input', function(e) {
+            const term = e.target.value.toLowerCase();
+            const filtered = allDomande.filter(d => 
+                d.descr.toLowerCase().includes(term) || 
+                d.descr_driver.toLowerCase().includes(term) || 
+                d.categoria_descr.toLowerCase().includes(term)
+            );
+            renderFruizione(filtered);
+        });
+
+        init();
+    });
+
+    // --- FUNZIONI DI EXPORT ---
+
+    function raggruppaDati(data) {
+        const tree = {};
+        data.forEach(d => {
+            const cat = d.categoria_descr || 'Varie';
+            const drv = d.descr_driver || 'Default';
+            if (!tree[cat]) tree[cat] = {};
+            if (!tree[cat][drv]) tree[cat][drv] = [];
+            tree[cat][drv].push(d);
+        });
+        return tree;
+    }
+
+    function exportToExcel() {
+        const tree = raggruppaDati(allDomande);
+        const dataToExport = [];
+
+        Object.keys(tree).sort().forEach(cat => {
+            Object.keys(tree[cat]).sort().forEach(drv => {
+                tree[cat][drv].forEach((dom, index) => {
+                    dataToExport.push({
+                        "CATEGORIA": index === 0 && drv === Object.keys(tree[cat]).sort()[0] ? cat : "",
+                        "DRIVER": index === 0 ? drv : "",
+                        "DOMANDA": dom.descr
+                    });
+                });
+            });
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Domande");
+        XLSX.writeFile(workbook, "Catalogo_Domande.xlsx");
+    }
+
+    function exportToPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.text("Catalogo Domande", 14, 15);
+        
+        const rows = allDomande.map(d => [d.categoria_descr, d.descr_driver, d.descr]);
+
+        doc.autoTable({
+            startY: 22,
+            head: [['Categoria', 'Driver', 'Domanda']],
+            body: rows,
+            theme: 'striped',
+            headStyles: { fillStyle: [13, 110, 253] }
+        });
+
+        doc.save("Catalogo_Domande.pdf");
+    }
+</script>
+{% endblock scripts %}

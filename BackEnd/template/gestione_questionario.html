@@ -73,20 +73,21 @@
                     </div>
 
                     <div class="table-responsive small border rounded p-2">
-                        <table id="domandeDisponibiliTable" class="table table-sm table-hover table-striped mb-0">
+                        <table id="domandeDisponibiliTable" class="table table-sm table-hover table-striped mb-0 w-100">
                             <thead class="bg-light">
-                                <tr>
-                                    <th style="width: 10%;">ID</th>
-                                    <th>Descrizione Domanda</th>
-                                    <th style="width: 25%;">Driver</th>
-                                    <th style="width: 10%;">Azione</th>
-                                </tr>
+                                    <tr>
+                                            <th style="width: 50px;">ID</th>
+                                            <th>Descrizione Domanda</th>
+                                            <th style="width: 150px;">Categoria</th> <th style="width: 150px;">Driver</th>
+                                            <th style="width: 60px;" class="text-center">Azione</th>
+                                        </tr>
                             </thead>
                             <tbody id="domandeDisponibiliTableBody">
-                                <tr><td colspan="4" class="text-center text-muted">Selezionare un driver o attendere...</td></tr>
+                                <tr><td colspan="5" class="text-center text-muted">Selezionare un driver o attendere...</td></tr>
                             </tbody>
                         </table>
                     </div>
+
                 </div>
             </div>
         </div>
@@ -122,25 +123,48 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         if (domandeDaMostrare.length === 0) {
-            domandeTableBody.innerHTML = '<tr><td colspan="4">Nessuna domanda disponibile.</td></tr>';
+            // ⭐ colspan portato a 5 perché abbiamo aggiunto una colonna
+            domandeTableBody.innerHTML = '<tr><td colspan="5" class="text-center">Nessuna domanda disponibile.</td></tr>';
             return;
         }
 
         domandeDaMostrare.forEach(domanda => {
             const row = document.createElement('tr');
-            const driverDescr = domanda.driver_rel ? domanda.driver_rel.descr : 'N.D.';
+            
+            // Recupero Driver e Categoria
+            const driverDescr = domanda.driver_rel ? domanda.driver_rel.descr : (domanda.driver_descr || 'N.D.');
+            const categoriaDescr = domanda.categoria_descr || 'N.D.'; 
+
             row.innerHTML = `
-                <td>${domanda.id}</td>
-                <td>${domanda.descr}</td>
-                <td>${driverDescr}</td>
-                <td><button class="btn btn-sm btn-success add-domanda" data-id="${domanda.id}">Aggiungi</button></td>
+                <td><small class="text-muted">${domanda.id}</small></td>
+                
+                <td style="white-space: normal; min-width: 150px;">
+                    <span class="fw-medium">${domanda.descr}</span>
+                </td>
+                
+                <td style="max-width: 150px; white-space: normal;">
+                    <span class="badge bg-light text-dark border fw-normal text-wrap" 
+                        style="font-size: 0.75rem; display: inline-block; text-align: left; line-height: 1.2;">
+                        ${categoriaDescr}
+                    </span>
+                </td> 
+
+                <td><span class="text-primary" style="font-size: 0.75rem;">${driverDescr}</span></td>
+                
+                <td class="text-center">
+                    <button class="btn btn-sm btn-success add-domanda" data-id="${domanda.id}" title="Aggiungi">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </td>
             `;
             domandeTableBody.appendChild(row);
         });
 
+        // Gestione eventi pulsanti (rimane uguale)
         document.querySelectorAll('.add-domanda').forEach(button => {
             button.addEventListener('click', (e) => {
-                const domandaId = parseInt(e.target.dataset.id);
+                const buttonElement = e.target.closest('.add-domanda'); // Fix per clic su icona
+                const domandaId = parseInt(buttonElement.dataset.id);
                 const domandaToAdd = allDomande.find(d => d.id === domandaId);
                 if (domandaToAdd) {
                     domandeSelezionate.push(domandaToAdd);
@@ -153,29 +177,47 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     function renderDomandeSelezionate() {
         domandeSelezionateContainer.innerHTML = '';
+        
         if (domandeSelezionate.length === 0) {
-            domandeSelezionateContainer.innerHTML = '<li class="list-group-item text-muted">Nessuna domanda selezionata.</li>';
+            domandeSelezionateContainer.innerHTML = '<li class="list-group-item text-muted text-center py-3">Nessuna domanda selezionata.</li>';
             return;
         }
 
         domandeSelezionate.forEach(domanda => {
             const item = document.createElement('li');
-            item.className = 'list-group-item d-flex justify-content-between align-items-center';
-            const driverDescr = domanda.driver_rel ? domanda.driver_rel.descr : 'N.D.';
+            // Usiamo border-primary per le domande selezionate
+            item.className = 'list-group-item d-flex justify-content-between align-items-center border-start border-4 border-primary mb-2 shadow-sm';
+            
+            const cat = domanda.categoria_descr || 'N.D.';
+            const drv = domanda.driver_descr || 'N.D.';
+
             item.innerHTML = `
-                <div>
-                    <strong>Domanda #${domanda.id}:</strong> ${domanda.descr}
-                    <small class="text-muted ms-2">(Driver: ${driverDescr})</small>
+                <div class="ms-2">
+                    <div class="fw-bold text-dark">Domanda #${domanda.id}</div>
+                    <div class="text-secondary">${domanda.descr}</div>
+                    <div class="text-muted small mt-1">
+                        <i class="fas fa-folder me-1 text-primary"></i><strong>${cat}</strong> 
+                        <i class="fas fa-chevron-right mx-1" style="font-size: 0.7rem;"></i> 
+                        <span>${drv}</span>
+                    </div>
                 </div>
-                <button class="btn btn-danger btn-sm remove-domanda" data-id="${domanda.id}">Rimuovi</button>
+                <button class="btn btn-outline-danger btn-sm remove-domanda ms-3" data-id="${domanda.id}" title="Rimuovi domanda">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
             `;
             domandeSelezionateContainer.appendChild(item);
         });
 
-        document.querySelectorAll('.remove-domanda').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const domandaId = parseInt(e.target.dataset.id);
+        // Aggancio dei listener
+        domandeSelezionateContainer.querySelectorAll('.remove-domanda').forEach(button => {
+            button.addEventListener('click', function() {
+                // "this" o "currentTarget" puntano sempre al button anche se clicchi l'icona interna
+                const domandaId = parseInt(this.getAttribute('data-id'));
+                
+                // Filtriamo la lista
                 domandeSelezionate = domandeSelezionate.filter(d => d.id !== domandaId);
+                
+                // Aggiorniamo entrambe le tabelle
                 renderDomande();
                 renderDomandeSelezionate();
             });
@@ -202,7 +244,14 @@ document.addEventListener('DOMContentLoaded', async function() {
             driversData.forEach(driver => {
                 const option = document.createElement('option');
                 option.value = driver.id;
-                option.textContent = driver.descr;
+                
+                // Recuperiamo categoria e descrizione (usando dei valori di default se mancano)
+                const categoria = driver.categoria_descr || "Senza Categoria";
+                const nomeDriver = driver.descr || "N.D.";
+                
+                // Formattiamo il testo della tendina
+                option.textContent = `${categoria} || ${nomeDriver}`; 
+                
                 driverFilter.appendChild(option);
             });
 

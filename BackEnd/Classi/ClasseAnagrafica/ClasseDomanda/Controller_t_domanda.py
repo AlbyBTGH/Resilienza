@@ -186,7 +186,14 @@ def get_drivers_for_dropdown():
         # Assumiamo che service_t_driver.get_all_drivers() esista e ritorni una lista di dict
         drivers = service_t_driver.get_all_drivers() 
         # Assumo che i campi siano ID e DESCR (adattabile se il service restituisce 'id' e 'descr')
-        drivers_data = [{'id': driver.get('ID') or driver.get('id'), 'descr': driver.get('DESCR') or driver.get('descr')} for driver in drivers]
+        drivers_data = [
+            {
+                'id': driver.get('id') or driver.get('ID'), 
+                'descr': driver.get('descr') or driver.get('DESCR'),
+                'categoria_descr': driver.get('categoria_descr') # <--- Dato aggiunto per la LOV
+            } for driver in drivers
+        ]
+
         logging.info(f"Recuperati {len(drivers_data)} driver per dropdown.")
         return jsonify(drivers_data), 200
     except Exception as e:
