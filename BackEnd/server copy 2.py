@@ -122,8 +122,6 @@ from Classi.ClasseCorrettive.Controller_correttiva import correttiva_controller
 
 from Classi.ClasseUtenti.Classe_t_utenti.Controller_t_utenti import t_utenti_controller
 
-from Classi.ClasseRelazione.Controller_relazione_finale import relazione_controller
-
 # Inizializzazione del logging
 logging.basicConfig(level=logging.INFO)
 
@@ -1597,8 +1595,6 @@ if __name__ == '__main__':
     
     print("DEBUG: Registrando la rotta di upload 'upload_domande' con prefisso /api/domande/upload")
     app.add_url_rule('/api/domande/upload', 'upload_domande', upload_domande, methods=['POST'])
-
-    app.register_blueprint(relazione_controller)
 
     try:
         # Crea tutte le tabelle definite nei modelli (incluse Utenti, Ruoli, Funzionalita, etc.)

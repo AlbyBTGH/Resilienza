@@ -1,0 +1,225 @@
+{% extends "index.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="p-2 border border-info rounded bg-light mb-3 shadow-sm">
+                <h5 class="text-primary fw-bold mb-0">Finalizzazione Progetto e Relazione Finale (ID: {{ id_pq }})</h5>
+            </div>
+        </div>
+    </div>
+
+    <form id="formRelazione" action="{{ url_for('relazione.salva_relazione_finale', id_pq=id_pq) }}" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        
+        <input type="hidden" id="img_radar_baseline_hidden" name="img_radar_baseline">
+        <input type="hidden" id="img_radar_actual_hidden" name="img_radar_actual">
+
+        <div class="row">
+            <div class="col-lg-6 mb-4">
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0">Dati della Relazione</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Sintesi Introduttiva</label>
+                            <textarea name="sintesi_introduttiva" class="form-control" rows="3" placeholder="Descrizione generale del progetto..."></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Analisi Criticita' Iniziali</label>
+                            <textarea name="analisi_criticita" class="form-control" rows="3" placeholder="Quali erano i punti deboli rilevati nella Baseline?"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Descrizione Interventi</label>
+                            <textarea name="descrizione_interventi" class="form-control" rows="3" placeholder="Sintesi delle correttive implementate..."></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Conclusioni Analista</label>
+                            <textarea name="conclusioni_analista" class="form-control" rows="3" placeholder="Risultato finale e suggerimenti futuri..."></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Firma Analista</label>
+                            <input type="text" name="firma_analista" class="form-control" value="{{ current_username }}" placeholder="Nome e Cognome">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6 mb-4">
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="mb-0">Confronto Grafico (Baseline vs Actual)</h6>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="row">
+                            <div class="col-md-6 border-end">
+                                <small class="text-muted">Radar Baseline</small>
+                                <canvas id="canvasRadarBaseline" style="max-height: 250px;"></canvas>
+                            </div>
+                            <div class="col-md-6">
+                                <small class="text-muted">Radar Actual</small>
+                                <canvas id="canvasRadarActual" style="max-height: 250px;"></canvas>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="alert alert-warning py-2 small">
+                            <i class="bi bi-info-circle"></i> I grafici sopra verranno "fotografati" e inseriti nel PDF finale al momento del salvataggio.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="button" onclick="salvaEChiudiRelazione()" class="btn btn-success btn-lg shadow">
+                        <i class="bi bi-check-circle"></i> Salva Relazione e Genera PDF
+                    </button>
+                    <a href="{{ url_for('appBT.report_progetti_questionari_page') }}" class="btn btn-outline-secondary">Annulla</a>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // 1. Configurazione Iniziale
+    const idProgettoQuestionario = {{ id_pq }};
+    
+    // Configurazione stili grafici (coerenti con la tua dashboard)
+    const radarConfigs = {
+        'Baseline': {
+            canvasId: 'canvasRadarBaseline',
+            label: 'Punteggio Baseline',
+            color: 'rgba(54, 162, 235, 1)',
+            bgColor: 'rgba(54, 162, 235, 0.2)'
+        },
+        'Actual': {
+            canvasId: 'canvasRadarActual',
+            label: 'Punteggio Actual',
+            color: 'rgba(75, 192, 192, 1)',
+            bgColor: 'rgba(75, 192, 192, 0.2)'
+        }
+    };
+
+    /**
+     * Funzione per disegnare un singolo radar
+     */
+    function drawRadarChart(canvasId, labels, data, config) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: config.label,
+                    data: data,
+                    backgroundColor: config.bgColor,
+                    borderColor: config.color,
+                    borderWidth: 2,
+                    pointBackgroundColor: config.color
+                }]
+            },
+            options: {
+                animation: false, // DISABILITATA per permettere la cattura immediata dell'immagine
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        beginAtZero: true,
+                        min: 0,
+                        max: 1,
+                        ticks: { stepSize: 0.2, display: false }
+                    }
+                },
+                plugins: {
+                    legend: { display: true }
+                }
+            }
+        });
+    }
+
+    /**
+     * Funzione che recupera i dati dalle tue API e popola i grafici
+     */
+    async function inizializzaGraficiRelazione() {
+        const idPQ = "{{ id_pq }}";
+        
+    const fetchAndDraw = async (version, canvasId) => {
+        const url = `/api/punteggio/grafico_radar/${idPQ}/${version}`;
+        try {
+            const response = await fetch(url);
+            const res = await response.json();
+            
+            // LOG FONDAMENTALE: clicca sulla freccetta in console per espandere questo Object!
+            console.log(`--- DEBUG COMPLETO ${version} ---`, res);
+
+            // Tentiamo di trovare etichette e valori ovunque siano
+            let labels = null;
+            let punteggi = null;
+
+            // Caso 1: Struttura standard { success: true, data: { labels: [], punteggi: [] } }
+            if (res.data) {
+                labels = res.data.labels || res.data.Labels;
+                punteggi = res.data.punteggi || res.data.Punteggi || res.data.data;
+            } 
+            // Caso 2: Struttura piatta { labels: [], punteggi: [] }
+            else {
+                labels = res.labels || res.Labels;
+                punteggi = res.punteggi || res.Punteggi || res.data;
+            }
+
+            if (labels && labels.length > 0) {
+                drawRadarChart(canvasId, labels, punteggi, version);
+            } else {
+                console.error(`ERRORE: Non trovo 'labels' in questo oggetto:`, res);
+            }
+        } catch (error) {
+            console.error(`Errore tecnico fetch ${version}:`, error);
+        }
+    };
+
+        await fetchAndDraw('Baseline', 'canvasRadarBaseline');
+        await fetchAndDraw('Actual', 'canvasRadarActual');
+    }
+
+    /**
+     * Funzione per catturare i canvas e inviare il form
+     */
+    function salvaEChiudiRelazione() {
+        // Recupero i riferimenti ai canvas
+        const canvasB = document.getElementById('canvasRadarBaseline');
+        const canvasA = document.getElementById('canvasRadarActual');
+
+        if (!canvasB || !canvasA) {
+            alert("Errore: Impossibile trovare i grafici radar nella pagina.");
+            return;
+        }
+
+        // Conversione in Base64 (PNG)
+        // Usiamo un piccolo timeout per sicurezza, sebbene animation sia false
+        try {
+            const base64Baseline = canvasB.toDataURL('image/png');
+            const base64Actual = canvasA.toDataURL('image/png');
+
+            // Inserimento nei campi hidden del form
+            document.getElementById('img_radar_baseline_hidden').value = base64Baseline;
+            document.getElementById('img_radar_actual_hidden').value = base64Actual;
+
+            console.log("Immagini radar catturate. Invio dei dati al server...");
+            
+            // Invio form
+            document.getElementById('formRelazione').submit();
+        } catch (e) {
+            console.error("Errore durante la cattura dei grafici:", e);
+            alert("Si � verificato un errore durante la generazione delle immagini dei grafici.");
+        }
+    }
+
+    // Avvio al caricamento della pagina
+    document.addEventListener('DOMContentLoaded', inizializzaGraficiRelazione);
+</script>
+{% endblock %}

@@ -302,7 +302,6 @@ function renderTable() {
         const dtInizio = p.dt_inizio ? p.dt_inizio.substring(0, 10) : '';
         const dtFine = p.dt_fine ? p.dt_fine.substring(0, 10) : '';
         const mod = p.data_ultima_modifica ? p.data_ultima_modifica.substring(0, 10) : '';
-        
         progettiTableBody.innerHTML += `
             <tr>
                 <td>${p.id}</td>
@@ -316,17 +315,21 @@ function renderTable() {
                 <td>${p.modificato_da || ''}</td>
                 <td>${mod}</td>
                 <td>
-                    <div class="d-flex flex-nowrap">
-                        <button class="btn btn-warning btn-sm me-1 edit-btn" data-id="${p.id}" title="Modifica">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="btn btn-danger btn-sm me-1 delete-btn" data-id="${p.id}" title="Elimina">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                        <button class="btn btn-info btn-sm me-1 associate-analisti-btn" data-id="${p.id}" title="Associa Analisti">
-                            <i class="fas fa-users"></i>
-                        </button>
-                    </div>
+                    <button class="btn btn-warning btn-sm me-1 edit-btn" data-id="${p.id}">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-danger btn-sm delete-btn" data-id="${p.id}">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <button class="btn btn-info btn-sm associate-analisti-btn" data-id="${p.id}" title="Associa Analisti">
+                        <i class="fas fa-users"></i>
+                    </button>
+                    <button class="btn btn-outline-primary btn-sm mx-1 report-relazione-btn" 
+                        data-id="${p.id}" 
+                        title="Redigi Relazione Finale">
+                      <i class="fas fa-file-contract"></i>
+                    </button>
+
                 </td>
             </tr>`;
     });
@@ -457,10 +460,10 @@ progettiTableBody.addEventListener('click', e => {
     // Controlla il bottone di Eliminazione
     } else if (btn.classList.contains('delete-btn')) {
         handleDelete(id);
-    // Bottone Associa Analisti
+    // ⭐ NUOVO CONTROLLO: Bottone Associa Analisti
     } else if (btn.classList.contains('associate-analisti-btn')) { 
         handleAssociateAnalisti(id); // Chiama la funzione per aprire la Modal
-    } 
+    }
 });
 
 // Ricerca
