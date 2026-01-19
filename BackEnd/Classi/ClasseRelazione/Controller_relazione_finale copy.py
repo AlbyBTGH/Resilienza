@@ -123,7 +123,7 @@ def download_pdf(id_pq):
         finally:
             session_db.close()
 
-        # 4. Renderizza il template HTML dedicato al PDF passando anche le correttive
+        # 3. Renderizza il template HTML dedicato al PDF passando anche le correttive
         html_content = render_template(
             "relazione_pdf.html", 
             relazione=relazione_salvata, 
@@ -131,7 +131,7 @@ def download_pdf(id_pq):
             nome_progetto=nome_progetto_reale
         )
 
-        # 5. Crea il PDF in memoria
+        # 4. Crea il PDF in memoria
         pdf_buffer = BytesIO()
         pisa_status = pisa.CreatePDF(html_content, dest=pdf_buffer)
 
@@ -139,21 +139,11 @@ def download_pdf(id_pq):
             print(f"Errore xhtml2pdf: {pisa_status.err}")
             return f"Errore nella generazione del PDF", 500
 
-        # 6. Prepara la risposta HTTP
-        # pdf_buffer.seek(0)
-        # response = make_response(pdf_buffer.read())
-        # response.headers['Content-Type'] = 'application/pdf'
-        # response.headers['Content-Disposition'] = f'attachment; filename=Relazione_Finale_{id_pq}.pdf'
-
+        # 5. Prepara la risposta HTTP
         pdf_buffer.seek(0)
-        nome_file_pulito = nome_progetto_reale.replace(" ", "_").replace("/", "-")
-        filename = f"RF_{nome_file_pulito}.pdf"
         response = make_response(pdf_buffer.read())
         response.headers['Content-Type'] = 'application/pdf'
-        
-        # Inseriamo il nuovo filename dinamico
-        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
-
+        response.headers['Content-Disposition'] = f'attachment; filename=Relazione_Finale_{id_pq}.pdf'
         
         return response
 

@@ -7,7 +7,7 @@
     <div class="row mb-3">
         <div class="col-12">
             <div class="p-2 border border-info rounded bg-light mb-3 shadow-sm">
-                <h5 class="text-primary fw-bold mb-0">Finalizzazione Progetto e Relazione Finale (ID: {{ id_pq }})</h5>
+                <h5 class="text-primary fw-bold mb-0">Relazione Finale || {{ nome_progetto }}</h5>
             </div>
         </div>
     </div>
@@ -18,66 +18,137 @@
         <input type="hidden" id="img_radar_baseline_hidden" name="img_radar_baseline">
         <input type="hidden" id="img_radar_actual_hidden" name="img_radar_actual">
 
-        <div class="row">
-            <div class="col-lg-6 mb-4">
-                <div class="card shadow-sm mb-3">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
                     <div class="card-header bg-primary text-white">
                         <h6 class="mb-0">Dati della Relazione</h6>
                     </div>
                     <div class="card-body">
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Sintesi Introduttiva</label>
-                            <textarea name="sintesi_introduttiva" class="form-control" rows="3" placeholder="Descrizione generale del progetto..."></textarea>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Sintesi Introduttiva</label>
+                                <textarea class="form-control" name="sintesi_introduttiva" rows="3" placeholder="Inserisci una sintesi...">{% if relazione %}{{ relazione.sintesi_introduttiva or '' }}{% endif %}</textarea>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Analisi Criticità Iniziali</label>
+                                <textarea class="form-control" name="analisi_criticita" rows="3" placeholder="Analisi criticità...">{% if relazione %}{{ relazione.analisi_criticita_iniziali or '' }}{% endif %}</textarea>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Descrizione Interventi</label>
+                                <textarea class="form-control" name="descrizione_interventi" rows="3" placeholder="Interventi effettuati...">{% if relazione %}{{ relazione.descrizione_interventi or '' }}{% endif %}</textarea>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Conclusioni Analista</label>
+                                <textarea class="form-control" name="conclusioni_analista" rows="3" placeholder="Conclusioni finali...">{% if relazione %}{{ relazione.conclusioni_analista or '' }}{% endif %}</textarea>
+                            </div>
+
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <div class="card shadow-sm border-warning">
+                                        <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                                            <h6 class="mb-0 fw-bold"><i class="fas fa-tools me-2"></i>Azioni Correttive Pianificate</h6>
+                                            <span class="badge bg-dark">{{ correttive|length }} Azioni</span>
+                                        </div>
+                                        <div class="card-body p-0">
+                                            <div class="table-responsive">
+                                                <table class="table table-hover mb-0">
+                                                    <thead class="table-light">
+                                                        <tr>
+                                                            <th style="width: 40%;">Descrizione Intervento</th>
+                                                            <th>Responsabile</th>
+                                                            <th>Scadenza</th>
+                                                            <th>Stato</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for c in correttive %}
+                                                        <tr>
+                                                            <td>{{ c.descrizione_correttiva }}</td>
+                                                            <td>{{ c.responsabile or 'Non assegnato' }}</td>
+                                                            <td>{{ c.data_scadenza.strftime('%d/%m/%Y') if c.data_scadenza }}</td>
+                                                            <td>
+                                                                <span class="badge {% if c.stato == 'Completata' %}bg-success{% elif c.stato == 'Aperta' %}bg-danger{% else %}bg-primary{% endif %}">
+                                                                    {{ c.stato }}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                        {% else %}
+                                                        <tr>
+                                                            <td colspan="4" class="text-center py-3 text-muted italic">
+                                                                Nessuna azione correttiva registrata per questo progetto.
+                                                            </td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Analisi Criticita' Iniziali</label>
-                            <textarea name="analisi_criticita" class="form-control" rows="3" placeholder="Quali erano i punti deboli rilevati nella Baseline?"></textarea>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Descrizione Interventi</label>
-                            <textarea name="descrizione_interventi" class="form-control" rows="3" placeholder="Sintesi delle correttive implementate..."></textarea>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Conclusioni Analista</label>
-                            <textarea name="conclusioni_analista" class="form-control" rows="3" placeholder="Risultato finale e suggerimenti futuri..."></textarea>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Firma Analista</label>
-                            <input type="text" name="firma_analista" class="form-control" value="{{ current_username }}" placeholder="Nome e Cognome">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Firma Analista</label>
+                                <input type="text" class="form-control" name="firma_analista" 
+                                    value="{% if relazione %}{{ relazione.firma_analista or '' }}{% else %}{{ current_username }}{% endif %}">
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div class="col-lg-6 mb-4">
-                <div class="card shadow-sm mb-3">
-                    <div class="card-header bg-info text-white">
-                        <h6 class="mb-0">Confronto Grafico (Baseline vs Actual)</h6>
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h6 class="mb-0">Grafico Radar: Baseline</h6>
                     </div>
-                    <div class="card-body text-center">
-                        <div class="row">
-                            <div class="col-md-6 border-end">
-                                <small class="text-muted">Radar Baseline</small>
-                                <canvas id="canvasRadarBaseline" style="max-height: 250px;"></canvas>
-                            </div>
-                            <div class="col-md-6">
-                                <small class="text-muted">Radar Actual</small>
-                                <canvas id="canvasRadarActual" style="max-height: 250px;"></canvas>
-                            </div>
-                        </div>
-                        <hr>
-                        <div class="alert alert-warning py-2 small">
-                            <i class="bi bi-info-circle"></i> I grafici sopra verranno "fotografati" e inseriti nel PDF finale al momento del salvataggio.
+                    <div class="card-body">
+                        <div style="height: 500px;"> <canvas id="canvasRadarBaseline"></canvas>
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
 
-                <div class="d-grid gap-2">
-                    <button type="button" onclick="salvaEChiudiRelazione()" class="btn btn-success btn-lg shadow">
-                        <i class="bi bi-check-circle"></i> Salva Relazione e Genera PDF
-                    </button>
-                    <a href="{{ url_for('appBT.report_progetti_questionari_page') }}" class="btn btn-outline-secondary">Annulla</a>
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-success">
+                    <div class="card-header bg-success text-white">
+                        <h6 class="mb-0">Grafico Radar: Actual</h6>
+                    </div>
+                    <div class="card-body">
+                        <div style="height: 500px;">
+                            <canvas id="canvasRadarActual"></canvas>
+                        </div>
+                    </div>
                 </div>
+            </div>
+        </div>
+
+        <div class="row mb-5">
+            <div class="col-12 text-end">
+                <a href="{{ url_for('appBT.associa_questionario_progetto_page') }}" class="btn btn-secondary shadow-sm">
+                    <i class="fas fa-arrow-left me-1"></i> Annulla e Torna all'elenco
+                </a>
+
+                <button type="button" class="btn btn-primary px-5" onclick="salvaEChiudiRelazione()">
+                    <i class="fas fa-save me-2"></i>Salva Relazione Finale
+                </button>
+              
+                {% if relazione %}
+                <a href="{{ url_for('relazione.download_pdf', id_pq=id_pq) }}" class="btn btn-danger shadow-sm">
+                    <i class="fas fa-file-pdf me-1"></i> Scarica PDF
+                </a>
+                {% endif %}
+      
             </div>
         </div>
     </form>
@@ -108,35 +179,67 @@
     /**
      * Funzione per disegnare un singolo radar
      */
-    function drawRadarChart(canvasId, labels, data, config) {
+    function drawRadarChart(canvasId, labels, data, version) {
         const ctx = document.getElementById(canvasId).getContext('2d');
+        const config = radarConfigs[version]; 
+
+        // Assicuriamoci che i dati siano numerici (Base 100)
+        const numericData = data.map(val => {
+            const n = parseFloat(val);
+            return isNaN(n) ? 0 : n;
+        });
+
         new Chart(ctx, {
             type: 'radar',
             data: {
                 labels: labels,
                 datasets: [{
                     label: config.label,
-                    data: data,
+                    data: numericData,
                     backgroundColor: config.bgColor,
                     borderColor: config.color,
                     borderWidth: 2,
-                    pointBackgroundColor: config.color
+                    pointBackgroundColor: config.color,
+                    pointRadius: 4,
+                    fill: true // Riempie l'area del poligono
                 }]
             },
             options: {
-                animation: false, // DISABILITATA per permettere la cattura immediata dell'immagine
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: false,
                 scales: {
                     r: {
-                        beginAtZero: true,
                         min: 0,
-                        max: 1,
-                        ticks: { stepSize: 0.2, display: false }
+                        max: 100, // <--- SCALA IMPOSTATA A 100
+                        beginAtZero: true,
+                        angleLines: {
+                            display: true,
+                            color: 'rgba(0, 0, 0, 0.15)'
+                        },
+                        grid: {
+                            display: true,
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        },
+                        ticks: {
+                            stepSize: 20, // Mostra i livelli 0, 20, 40, 60, 80, 100
+                            display: true,
+                            backdropColor: 'transparent'
+                        },
+                        pointLabels: {
+                            display: true,
+                            font: {
+                                size: 12,
+                                weight: 'bold'
+                            }
+                        }
                     }
                 },
                 plugins: {
-                    legend: { display: true }
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
                 }
             }
         });

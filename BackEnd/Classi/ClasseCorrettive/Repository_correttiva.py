@@ -166,3 +166,15 @@ class RepositoryCorrettiva:
         except Exception as e:
             # Questo cattura il ValueError sulla data/descrizione e lo rilancia al Controller (che lo trasforma in 400)
             raise
+
+    def get_correttive_by_list_id_pqd(self, session, list_id_pqd):
+            """
+            Recupera tutte le correttive che appartengono a una lista di ID domande.
+            """
+            try:
+                return session.query(Correttiva).filter(
+                    Correttiva.id_progetto_questionario_domanda.in_(list_id_pqd)
+                ).all()
+            except Exception as e:
+                print(f"ERRORE REPOSITORY CORRETTIVA: {e}")
+                return []

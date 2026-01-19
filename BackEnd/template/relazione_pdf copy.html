@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page { size: a4 portrait; margin: 1.5cm; }
+        body { font-family: Helvetica, Arial, sans-serif; font-size: 11pt; color: #333; }
+        .header { text-align: center; border-bottom: 2px solid #0056b3; margin-bottom: 20px; padding-bottom: 10px; }
+        .header h1 { color: #0056b3; margin: 0; }
+        .section { margin-top: 15px; }
+        .label { font-weight: bold; color: #0056b3; background: #f0f4f8; padding: 5px; display: block; border-left: 4px solid #0056b3; }
+        .content { padding: 10px; border: 1px solid #eee; margin-bottom: 10px; min-height: 40px; }
+        .radar-container { text-align: center; margin-top: 20px; page-break-inside: avoid; }
+        .radar-box { display: inline-block; width: 45%; vertical-align: top; }
+        .radar-img { width: 100%; max-width: 300px; border: 1px solid #ddd; }
+        .footer { margin-top: 30px; border-top: 1px solid #ccc; padding-top: 10px; font-size: 10pt; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Relazione Finale di Progetto</h1>
+        <p>Identificativo Associazione: <strong>{{ relazione.id_progetto_questionario }}</strong></p>
+    </div>
+
+    <div class="section">
+        <span class="label">Sintesi Introduttiva</span>
+        <div class="content">{{ relazione.sintesi_introduttiva or 'Nessuna sintesi inserita.' }}</div>
+    </div>
+
+    <div class="section">
+        <span class="label">Analisi Criticità Iniziali</span>
+        <div class="content">{{ relazione.analisi_criticita_iniziali or relazione.analisi_criticita or 'Nessuna analisi inserita.' }}</div>
+    </div>
+
+    <div class="section">
+        <span class="label">Descrizione Interventi</span>
+        <div class="content">{{ relazione.descrizione_interventi or 'Nessun intervento descritto.' }}</div>
+    </div>
+
+    <div class="section">
+        <span class="label">Conclusioni Analista</span>
+        <div class="content">{{ relazione.conclusioni_analista or 'Nessuna conclusione inserita.' }}</div>
+    </div>
+
+    <div class="radar-container">
+        <div class="radar-box">
+            <h4>Radar Baseline</h4>
+            {% if relazione.img_radar_baseline %}
+                <img src="{{ relazione.img_radar_baseline }}" class="radar-img">
+            {% else %}
+                <p style="font-size: 9pt; color: gray;">Grafico Baseline non disponibile</p>
+            {% endif %}
+        </div>
+        <div class="radar-box">
+            <h4>Radar Stato Attuale</h4>
+            {% if relazione.img_radar_actual %}
+                <img src="{{ relazione.img_radar_actual }}" class="radar-img">
+            {% else %}
+                <p style="font-size: 9pt; color: gray;">Grafico Actual non disponibile</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div style="margin-top: 20px;">
+        <h3 style="background-color: #f8f9fa; padding: 5px; border-bottom: 2px solid #ffc107;">
+            Azioni Correttive Collegate
+        </h3>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+            <thead>
+                <tr style="background-color: #eeeeee;">
+                    <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Intervento</th>
+                    <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">Responsabile</th>
+                    <th style="border: 1px solid #ccc; padding: 8px; text-align: center;">Scadenza</th>
+                    <th style="border: 1px solid #ccc; padding: 8px; text-align: center;">Stato</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in correttive %}
+                <tr>
+                    <td style="border: 1px solid #ccc; padding: 8px;">{{ c.descrizione_correttiva }}</td>
+                    <td style="border: 1px solid #ccc; padding: 8px;">{{ c.responsabile or '-' }}</td>
+                    <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">
+                        {{ c.data_scadenza.strftime('%d/%m/%Y') if c.data_scadenza }}
+                    </td>
+                    <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">{{ c.stato }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" style="border: 1px solid #ccc; padding: 8px; text-align: center;">
+                        Nessuna azione correttiva pianificata.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+
+    <div class="footer">
+        <table width="100%">
+            <tr>
+                <td><strong>Firma Analista:</strong> {{ relazione.firma_analista }}</td>
+                <td align="right">Data Documento: {{ relazione.data_inserimento.strftime('%d/%m/%Y') if relazione.data_inserimento else 'N/D' }}</td>
+            </tr>
+        </table>
+    </div>
+</body>
+</html>

@@ -1,0 +1,38 @@
+{% extends "index.html" %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">Dashboard Resilienza</h1>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card border-start border-primary border-4 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Progetti Totali</div>
+                    <div class="h3 mb-0 font-weight-bold text-dark">{{ n_progetti }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card border-start border-success border-4 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Progetti Aperti</div>
+                    <div class="h3 mb-0 font-weight-bold text-dark">{{ n_aperti }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card border-start border-info border-4 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Template Questionari</div>
+                    <div class="h3 mb-0 font-weight-bold text-dark">{{ n_template }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
