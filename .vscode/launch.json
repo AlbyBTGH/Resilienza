@@ -2,12 +2,17 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Avvio Diretto server.py",
-            "type": "python",
+            "name": "Python: Flask Resilienza (Script)",
+            "type": "debugpy",
             "request": "launch",
-            "program": "BackEnd/server.py", 
+            "program": "server.py",
             "console": "integratedTerminal",
-            "justMyCode": true
+            "jinja": true,
+            "cwd": "${workspaceFolder}/progetto_resilienza/BackEnd",
+            "env": {
+                "FLASK_DEBUG": "1",
+                "PYTHONPATH": "${workspaceFolder}/progetto_resilienza/BackEnd"
+            }
         }
     ]
 }
