@@ -1,0 +1,109 @@
+{% extends "index.html" %}
+
+{% block title %}Importazione Massiva{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div id="alertBox" class="mb-3">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category if category != 'danger' else 'danger' }} alert-dismissible fade show shadow-sm" role="alert">
+                {% if category == 'success' %}
+                    <i class="fas fa-check-circle me-2"></i>
+                {% else %}
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                {% endif %}
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="h4 mb-0 text-gray-800"><i class="fas fa-database me-2 text-primary"></i>Configurazione Massiva</h2>
+        <a href="{{ url_for('appBT.index') }}" class="btn btn-outline-secondary btn-sm shadow-sm">
+            <i class="fas fa-arrow-left me-1"></i> Torna alla Home
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-7">
+            <div class="card shadow mb-4 border-left-primary">
+                <div class="card-header py-3 bg-white">
+                    <h6 class="m-0 font-weight-bold text-primary">Caricamento File Excel/CSV</h6>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small">Usa questo strumento per caricare in un colpo solo Ambiti, Categorie, Driver e Domande.</p>
+                    
+                    <form action="{{ url_for('appBT.upload_massivo') }}" method="POST" enctype="multipart/form-data" id="uploadForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        
+                        <div class="mb-4 p-4 border rounded bg-light text-center">
+                            <i class="fas fa-file-excel fa-3x text-success mb-3"></i>
+                            <label for="file_xls" class="form-label d-block fw-bold">Trascina o seleziona il file</label>
+                            <input class="form-control" type="file" id="file_xls" name="file_xls" accept=".xlsx, .xls, .csv" required>
+                            <div class="form-text mt-2">Formati supportati: .xlsx, .xls, .csv</div>
+                        </div>
+
+                        <div class="d-grid shadow-sm">
+                            <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                                <i class="fas fa-cloud-upload-alt me-2"></i> Avvia Importazione
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 bg-light">
+                    <h6 class="m-0 font-weight-bold text-dark"><i class="fas fa-info-circle me-2"></i>Struttura Colonne Corretta</h6>
+                </div>
+                <div class="card-body">
+                    <p class="small">Il sistema cercherà queste <strong>esatte intestazioni</strong> (maiuscole/minuscole non contano):</p>
+                    
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span class="fw-bold">Ambito</span>
+                            <span class="badge bg-primary rounded-pill">Obbligatorio</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span class="fw-bold">Categoria</span>
+                            <span class="badge bg-primary rounded-pill">Obbligatorio</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span class="fw-bold">Driver</span>
+                            <span class="badge bg-primary rounded-pill">Obbligatorio</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span class="fw-bold">Domanda</span>
+                            <span class="badge bg-primary rounded-pill">Obbligatorio</span>
+                        </li>
+                    </ul>
+
+                    <div class="alert alert-warning mt-3 mb-0 small border-0">
+                        <i class="fas fa-lightbulb me-2"></i>
+                        <strong>Suggerimento:</strong> Se un ambito o una categoria esistono già nel database, il sistema li riconoscerà automaticamente senza crearne di duplicati.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block scripts %}
+<script>
+    // Effetto feedback al click sul pulsante
+    document.getElementById('uploadForm').addEventListener('submit', function() {
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.classList.replace('btn-primary', 'btn-secondary');
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Analisi del file in corso...';
+    });
+</script>
+{% endblock %}

@@ -5,9 +5,13 @@ import logging
 import pandas as pd
 import io
 import sys
+import os
+import markdown2
 from datetime import datetime, date
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask import flash, redirect, url_for, request # per import massivo
+from flask_wtf.csrf import CSRFProtect
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import (
@@ -120,6 +124,13 @@ from Classi.ClasseCorrettive.Controller_correttiva import correttiva_controller
 
 from Classi.ClasseUtenti.Classe_t_utenti.Controller_t_utenti import t_utenti_controller
 
+from Classi.ClasseRelazione.Controller_relazione_finale import relazione_controller
+
+from Classi.ClasseAsset.Controller_t_asset import t_asset_controller
+from Classi.ClasseAsset.Service_t_asset import Service_t_asset
+
+from Classi.ClasseImportMassivo.Service_Import_Massivo import ServiceImportMassivo
+
 # Inizializzazione del logging
 logging.basicConfig(level=logging.INFO)
 
@@ -153,6 +164,9 @@ service_t_risposta.create_table_if_not_exists()
 service_risposta_cliente = ServiceRispostaCliente()
 
 service_punteggi = ServiceProgettoQuestionarioPunteggio()
+
+service_t_asset = Service_t_asset()
+
 sys.modules[__name__].service_punteggi = service_punteggi
 
 
@@ -1426,9 +1440,84 @@ def report_progetti_questionari_page():
     )
 
 
+# Rotta per manuale app
+@appBT.route("/manuale_utente")
+@login_required
+def manuale_utente():
+    """
+    Legge il file manuale.md, lo converte in HTML e lo renderizza
+    mantenendo la struttura del menu dinamico dell'app.
+    """
+    # 1. Recupero dati sessione per il menu (come nelle altre tue rotte)
+    current_user_role_id = session.get('user_role_id')
+    current_user_email = session.get('user_email')
+    current_username = session.get('username')
+    current_user_role_descr = session.get('user_role_descr')
+
+    dynamic_menu = []
+    if current_user_role_id is not None:
+        dynamic_menu = service_t_funzionalita_utente.build_menu_structure(role_id=current_user_role_id)
+
+    # 2. Lettura e conversione del file Markdown
+    # Assicurati che manuale.md sia nella cartella /static/
+    filepath = os.path.join(os.path.dirname(__file__), 'static', 'manuale.md')
+    
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+            testo_markdown = f.read()
+        
+        # Conversione HTML con supporto a tabelle e liste
+        contenuto_html = markdown2.markdown(testo_markdown, extras=["tables", "fenced-code-blocks", "break-on-newline"])
+    
+    except FileNotFoundError:
+        contenuto_html = "<p class='text-danger'>Errore: Il file manuale.md non è stato trovato nella cartella static.</p>"
+
+    # 3. Rendering del template dedicato
+    return render_template(
+        "layout_manuale.html",
+        title="Manuale Utente Online",
+        menu_data=dynamic_menu,
+        current_user_email=current_user_email,
+        current_username=current_username,
+        current_user_role_descr=current_user_role_descr,
+        corpo_manuale=contenuto_html
+    )
 
 
+# Nuova rotta per la pagina di gestione Asset
+@appBT.route("/asset/<int:id_cliente>")
+@login_required
+def asset_page(id_cliente):
+    """
+    Renderizza la pagina di gestione Asset per un cliente specifico.
+    """
+    current_user_role_id = session.get('user_role_id')
+    current_user_email = session.get('user_email')
+    current_username = session.get('username')
+    current_user_role_descr = session.get('user_role_descr')
 
+    dynamic_menu = []
+    if current_user_role_id is not None:
+        dynamic_menu = service_t_funzionalita_utente.build_menu_structure(role_id=current_user_role_id)
+
+    from flask_wtf.csrf import generate_csrf
+    csrf_token = generate_csrf() 
+    
+    # Recuperiamo i dati del cliente (opzionale, per il titolo della pagina)
+    # cliente = service_t_cliente.get_cliente_by_id(id_cliente)
+    
+    return render_template(
+        "asset.html",
+        title="Gestione Asset Cliente",
+        id_cliente=id_cliente,
+        menu_data=dynamic_menu,
+        current_user_email=current_user_email,
+        current_username=current_username,
+        current_user_role_descr=current_user_role_descr,
+        csrf_token=csrf_token
+    )
+
+# upload massivo delle sole Domande da csv\xls
 def upload_domande():
     try:
         if 'file' not in request.files:
@@ -1495,6 +1584,68 @@ def upload_domande():
         print(f"ERRORE GENERICO: Si è verificata un'eccezione non gestita: {e}")
         return jsonify({"error": "Errore di rete o del server. Controlla il terminale per maggiori dettagli."}), 500
     
+
+# nuovo import massivo Ambito-Cat-Driver-Dom da csv\xls
+@appBT.route("/upload_massivo", methods=["GET", "POST"])
+@login_required
+@csrf.exempt  # <-- dico a Flask di non controllare il token qui
+def upload_massivo():
+    # --- 1. RECUPERO DATI SESSIONE PER IL MENU (IDENTICO ALLE TUE ROTTE) ---
+    current_user_role_id = session.get('user_role_id')
+    current_user_email = session.get('user_email')
+    current_username = session.get('user_name') # o session.get('username')
+    current_user_role_descr = session.get('user_role_descr')
+
+    dynamic_menu = []
+    if current_user_role_id is not None:
+        dynamic_menu = service_t_funzionalita_utente.build_menu_structure(role_id=current_user_role_id)
+
+    # --- 2. GESTIONE CARICAMENTO FILE (POST) ---
+    if request.method == "POST":
+        if 'file_xls' not in request.files:
+            flash("Selezionare un file Excel o CSV.", "warning")
+            return redirect(request.url)
+
+        file = request.files['file_xls']
+        if file.filename == '':
+            flash("Nessun file selezionato.", "warning")
+            return redirect(request.url)
+
+        # Salvataggio temporaneo
+        temp_dir = "Temp"
+        if not os.path.exists(temp_dir):
+            os.makedirs(temp_dir)
+        
+        file_path = os.path.join(temp_dir, file.filename)
+        file.save(file_path)
+
+        try:
+            # Esecuzione dell'importazione tramite il Service
+            successo, messaggio = ServiceImportMassivo.esegui_importazione(file_path, current_username)
+
+            if successo:
+                flash(messaggio, "success")
+            else:
+                flash(f"Attenzione: {messaggio}", "danger")
+
+        except Exception as e:
+            flash(f"Errore durante l'elaborazione: {str(e)}", "danger")
+        finally:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
+        return redirect(request.url)
+
+    # --- 3. RENDERING DELLA PAGINA (GET) CON MENU DINAMICO ---
+    return render_template(
+        "upload_massivo.html", # Usa il template che hai creato
+        title="Importazione Massiva",
+        menu_data=dynamic_menu,
+        current_user_email=current_user_email,
+        current_username=current_username,
+        current_user_role_descr=current_user_role_descr
+    )
+
             
 # --- AVVIO DELL'APPLICAZIONE FLASK ---
 if __name__ == '__main__':
@@ -1542,6 +1693,8 @@ if __name__ == '__main__':
     print("DEBUG: Registrando t_utenti_controller con prefisso /api/utenti")
     app.register_blueprint(t_utenti_controller, url_prefix='/api/utenti')
 
+    app.register_blueprint(t_asset_controller, url_prefix='/api/asset')
+
     print("DEBUG: Registrando risposta_cliente_controller con prefisso /api/risposta_cliente")
     # Il prefisso /api/risposta_cliente è corretto, dato che la rotta nel Controller è /salva_risposte_massive
     app.register_blueprint(risposta_cliente_controller)
@@ -1552,6 +1705,8 @@ if __name__ == '__main__':
     
     print("DEBUG: Registrando la rotta di upload 'upload_domande' con prefisso /api/domande/upload")
     app.add_url_rule('/api/domande/upload', 'upload_domande', upload_domande, methods=['POST'])
+
+    app.register_blueprint(relazione_controller)
 
     try:
         # Crea tutte le tabelle definite nei modelli (incluse Utenti, Ruoli, Funzionalita, etc.)

@@ -1,0 +1,160 @@
+{% extends "index.html" %}
+
+{% block title %}Gestione Asset - Cliente {{ id_cliente }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    {# Contenitore per i messaggi flash gestiti da JavaScript #}
+    <div class="messages mb-3"></div>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="text-primary">Gestione Asset</h4>
+        <a href="{{ url_for('appBT.index') }}" class="btn btn-info btn-sm">
+            <i class="fas fa-arrow-left me-1"></i> Torna alla Home
+        </a>
+    </div>
+
+    <div class="card mb-4 shadow-sm border-primary">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Importazione Asset da CSV</h5>
+            <i class="fas fa-file-csv fa-lg"></i>
+        </div>
+        <div class="card-body">
+            <form id="uploadAssetForm" enctype="multipart/form-data">
+                <input type="hidden" id="csrf_token" name="csrf_token" value="{{ csrf_token }}">
+                <div class="row align-items-end">
+                    <div class="col-md-8">
+                        <label for="fileCsv" class="form-label fw-bold">Seleziona File (Colonna richiesta: "descrizione")</label>
+                        <input class="form-control" type="file" id="fileCsv" name="file" accept=".csv" required>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-success w-100">
+                            <i class="fas fa-upload me-2"></i>Carica Asset
+                        </button>
+                    </div>
+                </div>
+            </form>
+            <div class="mt-2 small text-muted">
+                <i class="fas fa-info-circle me-1"></i> Il sistema scartera' automaticamente gli asset con descrizione gia presente per questo cliente.
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">Elenco Asset e Ponderazione RID</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle" id="assetsTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Descrizione Asset</th>
+                            <th style="width: 100px;">R</th>
+                            <th style="width: 100px;">I</th>
+                            <th style="width: 100px;">D</th>
+                            <th>V (Peso)</th>
+                            <th>Stato</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody id="assetsTableBody">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const uploadForm = document.getElementById('uploadAssetForm');
+        const assetsTableBody = document.getElementById('assetsTableBody');
+        const csrfToken = document.getElementById('csrf_token').value;
+        const idCliente = "{{ id_cliente }}";
+        
+        const API_UPLOAD_URL = `/api/asset/upload/${idCliente}`;
+        const API_GET_URL = `/api/asset/cliente/${idCliente}`; // Dovrai creare questa rotta nel controller
+
+        // Funzione per mostrare i messaggi flash
+        function showFlashMessage(message, category = 'info') {
+            const messagesContainer = document.querySelector('.messages');
+            const alertDiv = document.createElement('div');
+            alertDiv.classList.add('alert', `alert-${category}`, 'alert-dismissible', 'fade', 'show');
+            alertDiv.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+            messagesContainer.appendChild(alertDiv);
+            setTimeout(() => { if(bootstrap.Alert.getInstance(alertDiv)) new bootstrap.Alert(alertDiv).close(); }, 5000);
+        }
+
+        // Funzione per caricare gli asset nella tabella
+        async function loadAssets() {
+            try {
+                const response = await fetch(API_GET_URL);
+                if (!response.ok) throw new Error("Errore nel caricamento asset");
+                const assets = await response.json();
+                
+                assetsTableBody.innerHTML = '';
+                if (assets.length === 0) {
+                    assetsTableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Nessun asset trovato per questo cliente. Carica un file CSV.</td></tr>';
+                    return;
+                }
+
+                assets.forEach(asset => {
+                    const row = assetsTableBody.insertRow();
+                    row.innerHTML = `
+                        <td>${asset.id}</td>
+                        <td><strong>${asset.descr}</strong></td>
+                        <td><input type="number" class="form-control form-control-sm" value="${asset.r_val}" min="0" max="3"></td>
+                        <td><input type="number" class="form-control form-control-sm" value="${asset.i_val}" min="0" max="3"></td>
+                        <td><input type="number" class="form-control form-control-sm" value="${asset.d_val}" min="0" max="3"></td>
+                        <td><span class="badge bg-secondary">${asset.v_score || 0}</span></td>
+                        <td><span class="badge ${asset.stato === 'COMPLETATO' ? 'bg-success' : 'bg-warning'}">${asset.stato}</span></td>
+                        <td>
+                            <button class="btn btn-primary btn-sm btn-save-rid" data-id="${asset.id}"><i class="fas fa-save"></i></button>
+                        </td>
+                    `;
+                });
+            } catch (error) {
+                console.error(error);
+                showFlashMessage("Errore nel caricamento della tabella.", "danger");
+            }
+        }
+
+        // Gestione Upload CSV
+        uploadForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            formData.append('utente', "{{ current_username }}");
+
+            try {
+                const response = await fetch(API_UPLOAD_URL, {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'X-CSRFToken': csrfToken }
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showFlashMessage(result.message, 'success');
+                    uploadForm.reset();
+                    loadAssets();
+                } else {
+                    showFlashMessage(result.error, 'danger');
+                }
+            } catch (error) {
+                showFlashMessage("Errore di rete durante l'upload.", "danger");
+            }
+        });
+
+        loadAssets();
+    });
+</script>
+
+<style>
+    #assetsTable th, #assetsTable td { font-size: 0.85em; }
+    .form-control-sm { padding: 0.25rem 0.5rem; }
+</style>
+{% endblock %}

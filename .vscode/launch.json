@@ -8,10 +8,10 @@
             "program": "server.py",
             "console": "integratedTerminal",
             "jinja": true,
-            "cwd": "${workspaceFolder}/progetto_resilienza/BackEnd",
+            "cwd": "${workspaceFolder}/BackEnd",
             "env": {
                 "FLASK_DEBUG": "1",
-                "PYTHONPATH": "${workspaceFolder}/progetto_resilienza/BackEnd"
+                "PYTHONPATH": "${workspaceFolder}/BackEnd"
             }
         }
     ]
