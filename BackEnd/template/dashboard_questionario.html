@@ -2,191 +2,137 @@
 
 {% block title %}Dashboard Report Questionario{% endblock %}
 
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="h3 mb-0 text-gray-800"><i class="bi bi-cpu-fill text-primary me-2"></i>Analisi Risultati</h2>
+            <p class="text-muted mb-0">Questionario ID: <strong>{{ id_progetto_questionario }}</strong></p>
+        </div>
+        <a href="{{ url_for('appBT.report_progetti_questionari_page') }}" class="btn btn-outline-secondary btn-sm shadow-sm">
+            <i class="bi bi-arrow-left"></i> Torna alla Lista
+        </a>
+    </div>
 
-{% block content %}{# Aggiunto l'ID per coerenza con l'ultimo tentativo #}
-<div class="row">
-    <div class="col-12" id="mainDashboardContainer">
-        <div class="card shadow-sm h-100 p-3">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">Dashboard Punteggi Questionario ID: {{ id_progetto_questionario }}</h5>
-            </div>
-            <div class="card-body p-4">
-                
-
-                <div class="row mt-4 mb-4">
-                    
-                    <div class="col-md-6">
-                        <div class="card shadow-sm p-3">
-                            <h5 class="text-center text-primary">Radar Punteggio Baseline</h5>
-                            <canvas id="radarChartBaseline" width="450" height="450"></canvas>
-                            
-                            <div id="noDataMessageBaseline" class="alert alert-info text-center mt-3" style="display: none;">
-                                Dati Baseline non disponibili.
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-md-6">
-                        <div class="card shadow-sm p-3">
-                            <h5 class="text-center text-success">Radar Punteggio Actual</h5>
-                            <canvas id="radarChartActual" width="450" height="450"></canvas>
-                            
-                            <div id="noDataMessageActual" class="alert alert-info text-center mt-3" style="display: none;">
-                                Dati Actual non disponibili.
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="row mt-4">
-                    <div class="col-12 text-end">
-                        <a href="{{ url_for('punteggio.dettaglio_questionario_report_page', id_progetto_questionario=id_progetto_questionario) }}" 
-                           class="btn btn-secondary me-2">
-                            <i class="bi bi-list"></i> Torna al Report Dettagliato
-                        </a>
+    <div class="card shadow border-0 mb-4">
+        <div class="card-header bg-white py-3">
+            <ul class="nav nav-pills nav-fill" id="radarTab" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link active fw-bold" id="baseline-tab" data-bs-toggle="tab" data-bs-target="#baseline" type="button">
+                        <i class="bi bi-flag-fill me-2"></i>Punteggio Baseline
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link fw-bold" id="actual-tab" data-bs-toggle="tab" data-bs-target="#actual" type="button">
+                        <i class="bi bi-graph-up-arrow me-2"></i>Punteggio Actual
+                    </button>
+                </li>
+            </ul>
+        </div>
+        
+        <div class="card-body bg-light">
+            <div class="tab-content">
+                <div class="tab-pane fade show active" id="baseline" role="tabpanel">
+                    <div class="chart-container bg-white p-4 rounded shadow-sm border" style="position: relative; height: 65vh;">
+                        <canvas id="radarChartBaseline"></canvas>
+                        <div id="noDataMessageBaseline" class="alert alert-info text-center mt-3" style="display: none;"></div>
                     </div>
                 </div>
-
+                <div class="tab-pane fade" id="actual" role="tabpanel">
+                    <div class="chart-container bg-white p-4 rounded shadow-sm border" style="position: relative; height: 65vh;">
+                        <canvas id="radarChartActual"></canvas>
+                        <div id="noDataMessageActual" class="alert alert-info text-center mt-3" style="display: none;"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
-
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    const radarChartsInstance = {}; 
-    const idProgettoQuestionario = {{ id_progetto_questionario }}; 
-    
-    const CHART_CONFIG = {
-        Baseline: {
-            id: 'radarChartBaseline',
-            messageDiv: 'noDataMessageBaseline',
-            backgroundColor: 'rgba(255, 99, 132, 0.4)', 
-            borderColor: 'rgba(255, 99, 132, 1)',
-            label: 'Punteggio Baseline'
-        },
-        Actual: {
-            id: 'radarChartActual',
-            messageDiv: 'noDataMessageActual',
-            backgroundColor: 'rgba(75, 192, 192, 0.4)', 
-            borderColor: 'rgba(75, 192, 192, 1)',
-            label: 'Punteggio Actual'
-        }
-    };
+    const idProgettoQuestionario = {{ id_progetto_questionario }};
+    const chartInstances = {};
 
-    /**
-     * Funzione principale per disegnare il grafico.
-     */
-    function drawRadarChart(ctxId, labels, punteggi, config) {
-        const ctx = document.getElementById(ctxId).getContext('2d');
-        
-        // Rimuoviamo la distruzione e creazione dinamica se non c'è il dato
-        if (punteggi.length === 0) {
-            if (radarChartsInstance[ctxId]) {
-                radarChartsInstance[ctxId].destroy(); 
-            }
-            return;
-        }
-        
-        // Distrugge l'istanza precedente se esiste
-        if (radarChartsInstance[ctxId]) {
-            radarChartsInstance[ctxId].destroy(); 
-        }
+    function drawRadarChart(canvasId, labels, data, config) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
 
-        radarChartsInstance[ctxId] = new Chart(ctx, {
+        chartInstances[canvasId] = new Chart(ctx, {
             type: 'radar',
             data: {
                 labels: labels,
                 datasets: [{
                     label: config.label,
-                    data: punteggi,
-                    backgroundColor: config.backgroundColor, 
+                    data: data,
+                    backgroundColor: config.bgColor,
                     borderColor: config.borderColor,
+                    borderWidth: 3,
                     pointBackgroundColor: config.borderColor,
-                    pointBorderColor: '#fff',
-                    pointHoverBackgroundColor: '#fff',
-                    borderWidth: 2
+                    fill: true
                 }]
             },
             options: {
-                // Mantiene le impostazioni di dimensione fissa
-                responsive: false,
-                maintainAspectRatio: false, 
-                plugins: {
-                    legend: {
-                        display: false,
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: (context) => `${context.dataset.label}: ${context.raw.toFixed(2)}`,
-                        }
-                    }
-                },
+                responsive: true,
+                maintainAspectRatio: false,
                 scales: {
                     r: {
-                        angleLines: { display: true },
-                        
-                        // ⭐ FIX: FORZA IL LIMITE INFERIORE E SUPERIORE
-                        min: 0, 
-                        max: 100, // <--- USIAMO 'max' PER IMPOSTARE UN FONDO SCALA FISSO A 100
-                        
-                        ticks: {
-                            backdropColor: 'rgba(255, 255, 255, 0.7)',
-                            stepSize: 20 // 0, 20, 40, 60, 80, 100
-                        }
+                        beginAtZero: true,
+                        suggestedMax: 100, // <--- Modificato a 100 come nel tuo file copy
+                        ticks: { stepSize: 20 }
                     }
                 }
             }
         });
     }
 
-    /**
-     * Esegue il fetch dei dati e disegna entrambi i grafici.
-     */
-    function fetchAndDrawAllRadars(idProgettoQuestionario) {
-        const fetchAndDraw = (version) => {
-            const config = CHART_CONFIG[version];
-            const url = `/api/punteggio/grafico_radar/${idProgettoQuestionario}/${version}`;
-            const messageDiv = document.getElementById(config.messageDiv);
-            const canvasElement = document.getElementById(config.id);
-            
-            canvasElement.style.display = 'none';
-            messageDiv.style.display = 'block'; 
-            messageDiv.textContent = `Caricamento dati ${version}...`;
-
-            fetch(url)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.data.labels.length > 0) {
-                        messageDiv.style.display = 'none'; 
-                        
-                        canvasElement.style.display = 'block'; 
-                        
-                        // Chiama la funzione di disegno con le opzioni non-responsive
-                        drawRadarChart(config.id, data.data.labels, data.data.punteggi, config);
-                        
-                    } else {
-                        messageDiv.textContent = `Dati ${version} non disponibili per il grafico.`;
-                        canvasElement.style.display = 'none';
-                    }
-                })
-                .catch(error => {
-                    console.error(`Errore fetch dati radar ${version}:`, error);
-                    messageDiv.textContent = `Errore nel caricamento dei dati ${version}.`;
-                    canvasElement.style.display = 'none';
-                });
+    function fetchAndDraw(version) {
+        const configs = {
+            'Baseline': { id: 'radarChartBaseline', label: 'Baseline', bgColor: 'rgba(54, 162, 235, 0.2)', borderColor: 'rgb(54, 162, 235)', msgId: 'noDataMessageBaseline' },
+            'Actual': { id: 'radarChartActual', label: 'Actual', bgColor: 'rgba(75, 192, 192, 0.2)', borderColor: 'rgb(75, 192, 192)', msgId: 'noDataMessageActual' }
         };
-        
-        fetchAndDraw('Baseline');
-        fetchAndDraw('Actual');
+
+        const config = configs[version];
+        const msgDiv = document.getElementById(config.msgId);
+        const canvas = document.getElementById(config.id);
+
+        // ⭐ FIX: Passiamo 'version' esattamente come definita in configs (Con la MAIUSCOLA)
+        const url = `/api/punteggio/grafico_radar/${idProgettoQuestionario}/${version}`;
+
+        msgDiv.style.display = 'block';
+        msgDiv.textContent = `Caricamento dati ${version}...`;
+
+        fetch(url)
+            .then(response => {
+                if (!response.ok) throw new Error('Status ' + response.status);
+                return response.json();
+            })
+            .then(data => {
+                if (data.success && data.data.labels && data.data.labels.length > 0) {
+                    msgDiv.style.display = 'none';
+                    canvas.style.display = 'block';
+                    drawRadarChart(config.id, data.data.labels, data.data.punteggi, config);
+                } else {
+                    msgDiv.textContent = `Nessun dato trovato per ${version}. Assicurati di aver completato il questionario.`;
+                    canvas.style.display = 'none';
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                msgDiv.textContent = `Errore di connessione o dati non pronti.`;
+                canvas.style.display = 'none';
+            });
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
-        // Avvia il disegno immediatamente con dimensioni fisse
-        fetchAndDrawAllRadars(idProgettoQuestionario);
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchAndDraw('Baseline');
+        document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(tab => {
+            tab.addEventListener('shown.bs.tab', (e) => {
+                fetchAndDraw(e.target.id === 'actual-tab' ? 'Actual' : 'Baseline');
+            });
+        });
     });
 </script>
 {% endblock %}

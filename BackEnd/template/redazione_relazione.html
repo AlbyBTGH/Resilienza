@@ -48,53 +48,163 @@
                                 <label class="form-label fw-bold">Conclusioni Analista</label>
                                 <textarea class="form-control" name="conclusioni_analista" rows="3" placeholder="Conclusioni finali...">{% if relazione %}{{ relazione.conclusioni_analista or '' }}{% endif %}</textarea>
                             </div>
+                        </div>
 
-                            <div class="row mb-4">
-                                <div class="col-12">
-                                    <div class="card shadow-sm border-warning">
-                                        <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
-                                            <h6 class="mb-0 fw-bold"><i class="fas fa-tools me-2"></i>Azioni Correttive Pianificate</h6>
-                                            <span class="badge bg-dark">{{ correttive|length }} Azioni</span>
-                                        </div>
-                                        <div class="card-body p-0">
-                                            <div class="table-responsive">
-                                                <table class="table table-hover mb-0">
-                                                    <thead class="table-light">
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="card shadow-sm">
+                                    <div class="card-header bg-secondary text-white">
+                                        <h6 class="mb-0"><i class="fas fa-list-check me-2"></i>Dettaglio Risposte e Punteggi</h6>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover align-middle mb-0" style="table-layout: fixed; width: 100%;">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th style="width: 150px;" class="ps-3">Driver</th>
+                                                        <th>Domanda</th>
+                                                        <th style="width: 250px;">Risposta</th>
+                                                        <th style="width: 100px;" class="text-center">Punteggio</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% set ns = namespace(last_cat='') %}
+                                                    {% for r in risposte_dettaglio %}
+                                                        {# Gestione Intestazione Categoria #}
+                                                        {% if r.nome_categoria != ns.last_cat %}
+                                                            <tr class="bg-light">
+                                                                <td colspan="4" class="ps-3 fw-bold text-primary">
+                                                                    <i class="fas fa-folder-open me-2"></i>CATEGORIA: {{ r.nome_categoria }}
+                                                                </td>
+                                                            </tr>
+                                                            {% set ns.last_cat = r.nome_categoria %}
+                                                        {% endif %}
+
                                                         <tr>
-                                                            <th style="width: 40%;">Descrizione Intervento</th>
-                                                            <th>Responsabile</th>
-                                                            <th>Scadenza</th>
-                                                            <th>Stato</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {% for c in correttive %}
-                                                        <tr>
-                                                            <td>{{ c.descrizione_correttiva }}</td>
-                                                            <td>{{ c.responsabile or 'Non assegnato' }}</td>
-                                                            <td>{{ c.data_scadenza.strftime('%d/%m/%Y') if c.data_scadenza }}</td>
+                                                            <td class="ps-3 vertical-align-top">
+                                                                <small class="text-muted fw-bold text-uppercase" style="font-size: 0.7rem;">{{ r.nome_driver }}</small>
+                                                            </td>
                                                             <td>
-                                                                <span class="badge {% if c.stato == 'Completata' %}bg-success{% elif c.stato == 'Aperta' %}bg-danger{% else %}bg-primary{% endif %}">
-                                                                    {{ c.stato }}
+                                                                <div class="fw-bold" style="font-size: 0.9rem;">{{ r.testo_domanda }}</div>
+                                                            </td>
+                                                            <td>
+                                                                <div class="text-muted" style="font-size: 0.85rem;">
+                                                                    {{ r.risposta_testo if r.risposta_testo else '<span class="fst-italic">Non risposta</span>'|safe }}
+                                                                </div>
+                                                            </td>
+                                                            <td class="text-center">
+                                                                <span class="badge {% if r.punteggio and r.punteggio|float > 5 %}bg-success{% elif r.punteggio and r.punteggio|float > 0 %}bg-info{% else %}bg-light text-muted{% endif %}">
+                                                                    {{ r.punteggio if r.punteggio is not none else '0' }}
                                                                 </span>
                                                             </td>
                                                         </tr>
-                                                        {% else %}
+                                                    {% else %}
                                                         <tr>
-                                                            <td colspan="4" class="text-center py-3 text-muted italic">
-                                                                Nessuna azione correttiva registrata per questo progetto.
-                                                            </td>
+                                                            <td colspan="4" class="text-center p-4 text-muted">Nessun dato di dettaglio disponibile.</td>
                                                         </tr>
-                                                        {% endfor %}
-                                                    </tbody>
-                                                </table>
-                                            </div>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-
                         </div>
+
+
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="card shadow-sm border-info">
+                                    <div class="card-header bg-info text-white">
+                                        <h6 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Riepilogo Punteggi per Categoria</h6>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover align-middle mb-0">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th class="ps-3">Categoria</th>
+                                                        <th class="text-center" style="width: 200px;">Totale Baseline</th>
+                                                        <th class="text-center" style="width: 200px;">Totale Actual</th>
+                                                        <th class="text-center" style="width: 150px;">Delta</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for p in punteggi_categorie %}
+                                                    {% set delta = (p.peso_actual|float) - (p.peso_baseline|float) %}
+                                                    <tr>
+                                                        <td class="ps-3 fw-bold">{{ p.nome_categoria }}</td>
+                                                        <td class="text-center">
+                                                            <span class="badge bg-secondary fs-6">{{ p.peso_baseline }}</span>
+                                                        </td>
+                                                        <td class="text-center">
+                                                            <span class="badge bg-success fs-6">{{ p.peso_actual }}</span>
+                                                        </td>
+                                                        <td class="text-center">
+                                                            <span class="fw-bold {% if delta > 0 %}text-success{% elif delta < 0 %}text-danger{% else %}text-muted{% endif %}">
+                                                                {% if delta > 0 %}+{% endif %}{{ delta|round(2) }}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                    {% else %}
+                                                    <tr>
+                                                        <td colspan="4" class="text-center p-4 text-muted">Dati di riepilogo non ancora calcolati.</td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+
+                        <div class="row mt-4 mb-4">
+                            <div class="col-12">
+                                <div class="card shadow-sm border-warning">
+                                    <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-0 fw-bold"><i class="fas fa-tools me-2"></i>Azioni Correttive Pianificate</h6>
+                                        <span class="badge bg-dark">{{ correttive|length }} Azioni</span>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover mb-0">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th style="width: 40%;">Descrizione Intervento</th>
+                                                        <th>Responsabile</th>
+                                                        <th>Scadenza</th>
+                                                        <th>Stato</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for c in correttive %}
+                                                    <tr>
+                                                        <td>{{ c.descrizione_correttiva }}</td>
+                                                        <td>{{ c.responsabile or 'Non assegnato' }}</td>
+                                                        <td>{{ c.data_scadenza.strftime('%d/%m/%Y') if c.data_scadenza }}</td>
+                                                        <td>
+                                                            <span class="badge {% if c.stato == 'Completata' %}bg-success{% elif c.stato == 'Aperta' %}bg-danger{% else %}bg-primary{% endif %}">
+                                                                {{ c.stato }}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                    {% else %}
+                                                    <tr>
+                                                        <td colspan="4" class="text-center py-3 text-muted italic">
+                                                            Nessuna azione correttiva registrata per questo progetto.
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="row">
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">Firma Analista</label>
@@ -108,7 +218,7 @@
         </div>
 
         <div class="row mb-4">
-            <div class="col-12">
+            <div class="col-12 mb-4">
                 <div class="card shadow-sm">
                     <div class="card-header bg-secondary text-white">
                         <h6 class="mb-0">Grafico Radar: Baseline</h6>
@@ -119,17 +229,14 @@
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="row mb-4">
-            <div class="col-12">
+            <div class="col-12 mb-4">
                 <div class="card shadow-sm border-success">
                     <div class="card-header bg-success text-white">
                         <h6 class="mb-0">Grafico Radar: Actual</h6>
                     </div>
                     <div class="card-body">
-                        <div style="height: 500px;">
-                            <canvas id="canvasRadarActual"></canvas>
+                        <div style="height: 500px;"> <canvas id="canvasRadarActual"></canvas>
                         </div>
                     </div>
                 </div>
@@ -139,10 +246,10 @@
         <div class="row mb-5">
             <div class="col-12 text-end">
                 <a href="{{ url_for('appBT.associa_questionario_progetto_page') }}" class="btn btn-secondary shadow-sm">
-                    <i class="fas fa-arrow-left me-1"></i> Annulla e Torna all'elenco
+                    <i class="fas fa-arrow-left me-1"></i> Annulla e Torna
                 </a>
 
-                <button type="button" class="btn btn-primary px-5" onclick="salvaEChiudiRelazione()">
+                <button type="button" class="btn btn-primary px-5 shadow-sm" onclick="salvaEChiudiRelazione()">
                     <i class="fas fa-save me-2"></i>Salva Relazione Finale
                 </button>
               
@@ -151,7 +258,6 @@
                     <i class="fas fa-file-pdf me-1"></i> Scarica PDF
                 </a>
                 {% endif %}
-      
             </div>
         </div>
     </form>
@@ -160,10 +266,9 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-    // 1. Configurazione Iniziale
+    // Inizializzazione dati e grafici (invariata)
     const idProgettoQuestionario = {{ id_pq }};
     
-    // Configurazione stili grafici (coerenti con la tua dashboard)
     const radarConfigs = {
         'Baseline': {
             canvasId: 'canvasRadarBaseline',
@@ -179,14 +284,10 @@
         }
     };
 
-    /**
-     * Funzione per disegnare un singolo radar
-     */
     function drawRadarChart(canvasId, labels, data, version) {
         const ctx = document.getElementById(canvasId).getContext('2d');
         const config = radarConfigs[version]; 
 
-        // Assicuriamoci che i dati siano numerici (Base 100)
         const numericData = data.map(val => {
             const n = parseFloat(val);
             return isNaN(n) ? 0 : n;
@@ -204,7 +305,7 @@
                     borderWidth: 2,
                     pointBackgroundColor: config.color,
                     pointRadius: 4,
-                    fill: true // Riempie l'area del poligono
+                    fill: true
                 }]
             },
             options: {
@@ -214,118 +315,59 @@
                 scales: {
                     r: {
                         min: 0,
-                        max: 100, // <--- SCALA IMPOSTATA A 100
+                        max: 100,
                         beginAtZero: true,
-                        angleLines: {
-                            display: true,
-                            color: 'rgba(0, 0, 0, 0.15)'
-                        },
-                        grid: {
-                            display: true,
-                            color: 'rgba(0, 0, 0, 0.1)'
-                        },
-                        ticks: {
-                            stepSize: 20, // Mostra i livelli 0, 20, 40, 60, 80, 100
-                            display: true,
-                            backdropColor: 'transparent'
-                        },
-                        pointLabels: {
-                            display: true,
-                            font: {
-                                size: 12,
-                                weight: 'bold'
-                            }
-                        }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top'
+                        ticks: { stepSize: 20 },
+                        pointLabels: { font: { size: 12, weight: 'bold' } }
                     }
                 }
             }
         });
     }
 
-    /**
-     * Funzione che recupera i dati dalle tue API e popola i grafici
-     */
     async function inizializzaGraficiRelazione() {
         const idPQ = "{{ id_pq }}";
         
-    const fetchAndDraw = async (version, canvasId) => {
-        const url = `/api/punteggio/grafico_radar/${idPQ}/${version}`;
-        try {
-            const response = await fetch(url);
-            const res = await response.json();
-            
-            // LOG FONDAMENTALE: clicca sulla freccetta in console per espandere questo Object!
-            console.log(`--- DEBUG COMPLETO ${version} ---`, res);
+        const fetchAndDraw = async (version, canvasId) => {
+            const url = `/api/punteggio/grafico_radar/${idPQ}/${version}`;
+            try {
+                const response = await fetch(url);
+                const res = await response.json();
+                
+                let labels = res.data ? (res.data.labels || res.data.Labels) : (res.labels || res.Labels);
+                let punteggi = res.data ? (res.data.punteggi || res.data.Punteggi || res.data.data) : (res.punteggi || res.Punteggi || res.data);
 
-            // Tentiamo di trovare etichette e valori ovunque siano
-            let labels = null;
-            let punteggi = null;
-
-            // Caso 1: Struttura standard { success: true, data: { labels: [], punteggi: [] } }
-            if (res.data) {
-                labels = res.data.labels || res.data.Labels;
-                punteggi = res.data.punteggi || res.data.Punteggi || res.data.data;
-            } 
-            // Caso 2: Struttura piatta { labels: [], punteggi: [] }
-            else {
-                labels = res.labels || res.Labels;
-                punteggi = res.punteggi || res.Punteggi || res.data;
+                if (labels && labels.length > 0) {
+                    drawRadarChart(canvasId, labels, punteggi, version);
+                }
+            } catch (error) {
+                console.error(`Errore tecnico fetch ${version}:`, error);
             }
-
-            if (labels && labels.length > 0) {
-                drawRadarChart(canvasId, labels, punteggi, version);
-            } else {
-                console.error(`ERRORE: Non trovo 'labels' in questo oggetto:`, res);
-            }
-        } catch (error) {
-            console.error(`Errore tecnico fetch ${version}:`, error);
-        }
-    };
+        };
 
         await fetchAndDraw('Baseline', 'canvasRadarBaseline');
         await fetchAndDraw('Actual', 'canvasRadarActual');
     }
 
-    /**
-     * Funzione per catturare i canvas e inviare il form
-     */
     function salvaEChiudiRelazione() {
-        // Recupero i riferimenti ai canvas
         const canvasB = document.getElementById('canvasRadarBaseline');
         const canvasA = document.getElementById('canvasRadarActual');
 
         if (!canvasB || !canvasA) {
-            alert("Errore: Impossibile trovare i grafici radar nella pagina.");
+            alert("Errore: Impossibile trovare i grafici radar.");
             return;
         }
 
-        // Conversione in Base64 (PNG)
-        // Usiamo un piccolo timeout per sicurezza, sebbene animation sia false
         try {
-            const base64Baseline = canvasB.toDataURL('image/png');
-            const base64Actual = canvasA.toDataURL('image/png');
-
-            // Inserimento nei campi hidden del form
-            document.getElementById('img_radar_baseline_hidden').value = base64Baseline;
-            document.getElementById('img_radar_actual_hidden').value = base64Actual;
-
-            console.log("Immagini radar catturate. Invio dei dati al server...");
-            
-            // Invio form
+            document.getElementById('img_radar_baseline_hidden').value = canvasB.toDataURL('image/png');
+            document.getElementById('img_radar_actual_hidden').value = canvasA.toDataURL('image/png');
             document.getElementById('formRelazione').submit();
         } catch (e) {
-            console.error("Errore durante la cattura dei grafici:", e);
-            alert("Si � verificato un errore durante la generazione delle immagini dei grafici.");
+            console.error("Errore cattura grafici:", e);
+            alert("Errore durante la generazione delle immagini dei grafici.");
         }
     }
 
-    // Avvio al caricamento della pagina
     document.addEventListener('DOMContentLoaded', inizializzaGraficiRelazione);
 </script>
 {% endblock %}
