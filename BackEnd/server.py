@@ -165,6 +165,7 @@ service_risposta_cliente = ServiceRispostaCliente()
 
 service_punteggi = ServiceProgettoQuestionarioPunteggio()
 
+# Istanzia il servizio per la gestione Asset
 service_t_asset = Service_t_asset()
 
 sys.modules[__name__].service_punteggi = service_punteggi
