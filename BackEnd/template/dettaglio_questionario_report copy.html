@@ -4,7 +4,6 @@
 
 
 {% block content %}
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <div class="row">
     <div class="col-12">
         <div class="card shadow-sm h-100 p-3">
@@ -391,33 +390,6 @@ function handleRispostaChange(selectElement) {
         });
 }
 
-function initDragAndDrop() {
-    const container = document.getElementById('reportContainer');
-    if (!container) return;
-
-    new Sortable(container, {
-        animation: 150,
-        handle: '.table-secondary', // Permette il trascinamento cliccando sulla riga grigia della categoria
-        draggable: '.categoria-block', // Definisce cosa può essere spostato
-        onEnd: function () {
-            // Raccoglie gli ID nell'ordine risultante dopo lo spostamento
-            const ordine = Array.from(container.querySelectorAll('.categoria-block'))
-                               .map(el => el.dataset.id)
-                               .filter(id => id && id !== "undefined");
-
-            // Invia l'ordine al tuo controller Python
-            fetch('/api/categoria/aggiorna_ordine', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': CSRF_TOKEN 
-                },
-                body: JSON.stringify({ ordine: ordine })
-            });
-        }
-    });
-}
-
 function renderReport(data) {
     const reportContainer = document.getElementById('reportContainer');
     reportContainer.innerHTML = ''; 
@@ -427,32 +399,39 @@ function renderReport(data) {
         return;
     }
 
-    // Raggruppamento per Categoria (identico al tuo)
+    // Raggruppamento per Categoria
     const categorie = data.reduce((acc, item) => {
         const cat = item.categoria_descr || "Generale";
-        if (!acc[cat]) acc[cat] = { id: item.id_categoria, items: [] };
-        acc[cat].items.push(item);
+        if (!acc[cat]) acc[cat] = [];
+        acc[cat].push(item);
         return acc;
     }, {});
 
-    // Usiamo un contenitore per ogni categoria per permettere il drag&drop di blocchi interi
-    Object.keys(categorie).forEach(catNome => {
-        const catData = categorie[catNome];
-        
-        // Creiamo un blocco per la categoria (mantenendo la tua tabella originale dentro)
-        let catHtml = `
-            <div class="categoria-block mb-4" data-id="${catData.id}">
-                <table class="table table-hover align-middle mb-0" style="min-width: 800px;">
-                    <tbody>
-                        <tr class="table-secondary" style="cursor: move;">
-                            <td colspan="3" class="fw-bold text-uppercase small" style="letter-spacing: 1px;">
-                                <i class="bi bi-bookmark-fill me-2"></i>Categoria: ${catNome}
-                            </td>
-                        </tr>`;
+    let fullHtml = `
+        <table class="table table-hover align-middle mb-0" style="min-width: 800px;">
+            <thead class="table-dark" style="position: sticky; top: 0; z-index: 10;">
+                <tr>
+                    <th style="width: 45%;">Domanda</th>
+                    <th style="width: 35%;">Risposta</th>
+                    <th style="width: 20%;" class="text-center">Azioni Correttive</th>
+                </tr>
+            </thead>
+            <tbody>`;
 
-        catData.items.forEach(item => {
+    Object.keys(categorie).forEach(catNome => {
+        fullHtml += `
+            <tr class="table-secondary">
+                <td colspan="3" class="fw-bold text-uppercase small" style="letter-spacing: 1px;">
+                    <i class="bi bi-bookmark-fill me-2"></i>Categoria: ${catNome}
+                </td>
+            </tr>`;
+
+        categorie[catNome].forEach(item => {
+            console.log("Dati ricevuti per la domanda:", item); 
             const isSaved = !!item.risposta_salvata_id;
             const statusColor = isSaved ? '#198754' : '#ffc107'; 
+            
+            // ⭐ RECUPERO DRIVER
             const driverStr = item.driver_descr ? `[${item.driver_descr}] ` : '';
 
             let options = `<option value="">-- Seleziona --</option>`;
@@ -463,22 +442,22 @@ function renderReport(data) {
 
             const testoPerJS = item.testo.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
-            catHtml += `
+            fullHtml += `
                 <tr id="row-${item.id_associazione}" style="border-left: 6px solid ${statusColor}">
-                    <td class="ps-3" style="width: 45%;">
+                    <td class="ps-3">
                         <small class="text-muted d-block">ID: ${item.id_domanda}</small>
                         <span class="fw-semibold">
                             <span class="text-primary small">${driverStr}</span>${item.testo}
                         </span>
                     </td>
-                    <td style="width: 35%;">
+                    <td>
                         <select class="form-select form-select-sm shadow-sm" 
                                 data-id-associazione="${item.id_associazione}" 
                                 onchange="handleRispostaChange(this)">
                             ${options}
                         </select>
                     </td>
-                    <td class="text-center" style="width: 20%;">
+                    <td class="text-center">
                         <button class="btn btn-sm ${isSaved ? 'btn-outline-primary' : 'btn-light'} btn-correttiva" 
                                 data-id-pqd="${item.id_associazione}"
                                 onclick="window.openCorrettivaModal(${item.id_associazione}, '${testoPerJS}')">
@@ -487,18 +466,16 @@ function renderReport(data) {
                     </td>
                 </tr>`;
         });
-
-        catHtml += `</tbody></table></div>`;
-        reportContainer.innerHTML += catHtml;
     });
 
-    // ATTIVAZIONE DRAG AND DROP
-    initDragAndDrop();
+    fullHtml += `</tbody></table>`;
+    reportContainer.innerHTML = fullHtml;
 
     if (typeof checkAndHighlightCorrettive === "function") {
         checkAndHighlightCorrettive();
     }
 }
+
 
 // ======================================================================
 // 3. GESTIONE INTERAZIONE UTENTE E SALVATAGGIO 
